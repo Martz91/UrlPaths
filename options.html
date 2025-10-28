@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>URL Paths Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main class="layout">
+    <section class="panel">
+      <header class="panel__header">
+        <h1 class="panel__title">URL Paths</h1>
+        <p class="panel__subtitle">Create reusable URL transformations and jump to related pages faster.</p>
+      </header>
+      <form id="ruleForm" class="form" autocomplete="off">
+        <input type="hidden" id="ruleIndex" value="">
+        <div class="form__group">
+          <label for="pattern">Pattern</label>
+          <input id="pattern" name="pattern" type="text" required placeholder="Example: https://([a-z0-9-]+)\\.sharepoint\\.com/sites/([^/]+)">
+          <p class="form__hint">Select string match for simple substring detection or regex for capture groups.</p>
+        </div>
+        <div class="form__group form__group--inline">
+          <label for="type">Match type</label>
+          <select id="type" name="type">
+            <option value="string">String</option>
+            <option value="regex">Regex</option>
+          </select>
+        </div>
+        <div class="form__group">
+          <label for="transformations">Transformations</label>
+          <textarea id="transformations" name="transformations" rows="5" placeholder="One URL template per line"></textarea>
+          <p class="form__hint">Regex templates support <code>\1</code>, <code>\2</code>, etc. String templates support <code>{{url}}</code> and <code>{{pattern}}</code>.</p>
+        </div>
+        <fieldset class="form__test">
+          <legend>Test rule</legend>
+          <div class="form__group">
+            <label for="sampleUrl">Sample URL</label>
+            <input id="sampleUrl" type="url" placeholder="Paste a URL to test the rule">
+          </div>
+          <div class="form__actions form__actions--test">
+            <button id="testRule" type="button">Test</button>
+            <span id="testStatus" class="status"></span>
+          </div>
+          <ul id="testResults" class="test-results"></ul>
+        </fieldset>
+        <div class="form__actions">
+          <button id="saveRule" type="submit">Save rule</button>
+          <button id="resetForm" type="button">Reset</button>
+        </div>
+        <p id="formStatus" class="status"></p>
+      </form>
+    </section>
+    <section class="panel">
+      <header class="panel__header">
+        <h2 class="panel__title">Saved rules</h2>
+        <p class="panel__subtitle">Edit or delete existing rules. Rules sync across devices.</p>
+      </header>
+      <div id="rulesList" class="rules"></div>
+    </section>
+    <section class="panel">
+      <header class="panel__header">
+        <h2 class="panel__title">Import &amp; Export</h2>
+        <p class="panel__subtitle">Backup rules or share them with teammates.</p>
+      </header>
+      <div class="import">
+        <label class="import__mode" for="importMode">Import mode</label>
+        <select id="importMode">
+          <option value="merge">Merge with existing</option>
+          <option value="replace">Replace existing</option>
+        </select>
+        <div class="import__actions">
+          <button id="importBtn" type="button">Import JSON</button>
+          <button id="exportBtn" type="button">Export JSON</button>
+        </div>
+        <input id="importFile" type="file" accept="application/json,.json" hidden>
+        <p class="form__hint">Imported JSON should be an array of rule objects matching the structure above.</p>
+      </div>
+    </section>
+  </main>
+  <script src="options.js"></script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>URL Paths</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main class="popup">
+    <header class="popup__header">
+      <h1 class="popup__title">URL Paths</h1>
+      <button id="manageRules" class="popup__manage" type="button">Manage rules</button>
+    </header>
+    <section id="matches" class="popup__matches" aria-live="polite"></section>
+    <p id="status" class="popup__status"></p>
+  </main>
+  <template id="matchTemplate">
+    <article class="match">
+      <h2 class="match__title"></h2>
+      <p class="match__source"></p>
+      <ul class="match__list"></ul>
+    </article>
+  </template>
+  <template id="transformTemplate">
+    <li class="match__item">
+      <button class="match__button" type="button"></button>
+    </li>
+  </template>
+  <script src="popup.js"></script>
+</body>
+</html>

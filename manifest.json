@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "URL Paths",
+  "description": "Jump between related URLs using user-defined patterns and templates.",
+  "version": "1.0.0",
+  "permissions": ["storage", "tabs", "activeTab"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "URL Paths"
+  },
+  "options_page": "options.html"
+}
