@@ -2,7 +2,9 @@ const ruleForm = document.getElementById("ruleForm");
 const ruleIndexField = document.getElementById("ruleIndex");
 const patternInput = document.getElementById("pattern");
 const typeSelect = document.getElementById("type");
-const transformationsInput = document.getElementById("transformations");
+const transformationsList = document.getElementById("transformationsList");
+const addTransformationBtn = document.getElementById("addTransformation");
+const transformRowTemplate = document.getElementById("transformRowTemplate");
 const sampleUrlInput = document.getElementById("sampleUrl");
 const testButton = document.getElementById("testRule");
 const testResultsList = document.getElementById("testResults");
@@ -25,6 +27,9 @@ testButton.addEventListener("click", onTestRule);
 importBtn.addEventListener("click", () => importFile.click());
 exportBtn.addEventListener("click", onExport);
 importFile.addEventListener("change", onImport);
+if (addTransformationBtn) {
+  addTransformationBtn.addEventListener("click", () => addTransformationRow());
+}
 
 async function init() {
   await loadPaths();
@@ -34,10 +39,13 @@ async function init() {
 
 async function loadPaths() {
   const stored = await storageGet({ paths: [] });
-  paths = Array.isArray(stored.paths) ? stored.paths.filter(isValidRuleShape) : [];
+  paths = Array.isArray(stored.paths)
+    ? stored.paths.map(upgradeRule).filter(Boolean)
+    : [];
 }
 
 async function persistPaths(message) {
+  paths = paths.map(upgradeRule).filter(Boolean);
   await storageSet({ paths });
   if (message) {
     showFormStatus(message);
@@ -49,10 +57,7 @@ async function onSaveRule(event) {
   event.preventDefault();
   const pattern = patternInput.value.trim();
   const type = typeSelect.value === "regex" ? "regex" : "string";
-  const transformations = transformationsInput.value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const transformations = collectTransformations();
 
   if (!pattern) {
     showFormStatus("Pattern is required.");
@@ -66,16 +71,22 @@ async function onSaveRule(event) {
 
   const indexValue = ruleIndexField.value;
   const rule = { pattern, type, transformations };
+  const upgradedRule = upgradeRule(rule);
+
+  if (!upgradedRule) {
+    showFormStatus("Unable to save rule. Check the inputs.");
+    return;
+  }
 
   try {
     if (indexValue) {
       const index = Number(indexValue);
       if (Number.isInteger(index) && index >= 0 && index < paths.length) {
-        paths[index] = rule;
+        paths[index] = upgradedRule;
         await persistPaths("Rule updated.");
       }
     } else {
-      paths.push(rule);
+      paths.push(upgradedRule);
       await persistPaths("Rule saved.");
     }
     resetForm();
@@ -89,6 +100,8 @@ function resetForm() {
   ruleForm.reset();
   ruleIndexField.value = "";
   typeSelect.value = "string";
+  clearTransformations();
+  addTransformationRow();
   testResultsList.innerHTML = "";
   testStatus.textContent = "";
 }
@@ -122,9 +135,19 @@ function renderRules() {
 
     const list = document.createElement("ol");
     list.className = "rule-card__list";
-    rule.transformations.forEach((tpl) => {
+    rule.transformations.forEach((transform) => {
       const item = document.createElement("li");
-      item.textContent = tpl;
+      item.className = "rule-card__transform";
+
+      const nameEl = document.createElement("span");
+      nameEl.className = "rule-card__transform-name";
+      nameEl.textContent = transform.name || transform.template;
+
+      const templateEl = document.createElement("span");
+      templateEl.className = "rule-card__transform-template";
+      templateEl.textContent = transform.template;
+
+      item.append(nameEl, templateEl);
       list.appendChild(item);
     });
 
@@ -152,7 +175,9 @@ function renderRules() {
 function populateForm(rule, index) {
   patternInput.value = rule.pattern;
   typeSelect.value = rule.type === "regex" ? "regex" : "string";
-  transformationsInput.value = rule.transformations.join("\n");
+  clearTransformations();
+  const list = rule.transformations && rule.transformations.length ? rule.transformations : [{ name: "", template: "" }];
+  list.forEach((transform) => addTransformationRow(transform));
   ruleIndexField.value = String(index);
   showFormStatus("Editing rule #" + (index + 1) + ". Save to apply changes.");
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -187,10 +212,7 @@ function onTestRule() {
   const rule = {
     pattern: patternInput.value.trim(),
     type: typeSelect.value === "regex" ? "regex" : "string",
-    transformations: transformationsInput.value
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean),
+    transformations: collectTransformations(),
   };
 
   if (!rule.pattern || rule.transformations.length === 0) {
@@ -198,7 +220,13 @@ function onTestRule() {
     return;
   }
 
-  const results = resolveTransformations(rule, sampleUrl, { strict: false });
+  const upgradedRule = upgradeRule(rule);
+  if (!upgradedRule) {
+    testStatus.textContent = "Check the rule details and try again.";
+    return;
+  }
+
+  const results = resolveTransformations(upgradedRule, sampleUrl, { strict: false });
   if (!results || results.length === 0) {
     testStatus.textContent = "No match for this sample URL.";
     return;
@@ -207,9 +235,18 @@ function onTestRule() {
   results.forEach((item) => {
     const li = document.createElement("li");
     li.className = "test-results__item";
-    li.innerHTML = `<strong>Target:</strong> ${escapeHtml(item.target)}<br><small>Template: ${escapeHtml(
-      item.template
-    )}</small>`;
+    const nameEl = document.createElement("div");
+    const nameStrong = document.createElement("strong");
+    nameStrong.textContent = item.name || item.target;
+    nameEl.appendChild(nameStrong);
+
+    const targetEl = document.createElement("div");
+    targetEl.textContent = `Target: ${item.target}`;
+
+    const templateEl = document.createElement("small");
+    templateEl.textContent = `Template: ${item.template}`;
+
+    li.append(nameEl, targetEl, templateEl);
     if (!item.validUrl) {
       const warn = document.createElement("div");
       warn.className = "form__hint";
@@ -224,7 +261,15 @@ function onTestRule() {
 
 function resolveTransformations(rule, url, options = {}) {
   const strict = options.strict !== false;
-  if (!rule || typeof rule.pattern !== "string" || !Array.isArray(rule.transformations)) {
+  if (!rule || typeof rule.pattern !== "string") {
+    return null;
+  }
+
+  const transformations = Array.isArray(rule.transformations)
+    ? rule.transformations.map(toTransformation).filter(Boolean)
+    : [];
+
+  if (!transformations.length) {
     return null;
   }
 
@@ -236,43 +281,47 @@ function resolveTransformations(rule, url, options = {}) {
       console.warn("Invalid regex pattern", rule.pattern, error);
       return null;
     }
+
     const match = url.match(regex);
     if (!match) {
       return null;
     }
-    return rule.transformations
-      .filter((tpl) => typeof tpl === "string" && tpl.length > 0)
-      .map((tpl) => {
-        const target = tpl.replace(/\\(\d+)/g, (full, group) => {
+
+    return transformations
+      .map(({ name, template }) => {
+        const target = template.replace(/\\(\d+)/g, (full, group) => {
           const groupIndex = Number(group);
           return match[groupIndex] ?? "";
         });
+        const validUrl = isLikelyUrl(target);
         return {
-          template: tpl,
+          name: name || target,
+          template,
           target,
-          validUrl: isLikelyUrl(target),
+          validUrl,
         };
       })
-      .filter((item) => !strict || item.validUrl);
+      .filter((item) => item.target && (!strict || item.validUrl));
   }
 
   if (!url.includes(rule.pattern)) {
     return null;
   }
 
-  return rule.transformations
-    .filter((tpl) => typeof tpl === "string" && tpl.length > 0)
-    .map((tpl) => {
-      const target = tpl
+  return transformations
+    .map(({ name, template }) => {
+      const target = template
         .replace(/\{\{\s*url\s*\}\}/gi, url)
         .replace(/\{\{\s*pattern\s*\}\}/gi, rule.pattern);
+      const validUrl = isLikelyUrl(target);
       return {
-        template: tpl,
+        name: name || target,
+        template,
         target,
-        validUrl: isLikelyUrl(target),
+        validUrl,
       };
     })
-    .filter((item) => !strict || item.validUrl);
+    .filter((item) => item.target && (!strict || item.validUrl));
 }
 
 function isLikelyUrl(value) {
@@ -282,6 +331,114 @@ function isLikelyUrl(value) {
   } catch (error) {
     return false;
   }
+}
+
+function addTransformationRow(data = {}) {
+  if (!transformRowTemplate || !transformationsList) {
+    return;
+  }
+
+  const fragment = transformRowTemplate.content.cloneNode(true);
+  const row = fragment.querySelector(".transform-row");
+  const nameInput = row.querySelector("[data-transform-name]");
+  const templateInput = row.querySelector("[data-transform-template]");
+  const removeBtn = row.querySelector("[data-remove-transform]");
+
+  nameInput.value = data.name ?? "";
+  templateInput.value = data.template ?? "";
+
+  removeBtn.addEventListener("click", () => {
+    row.remove();
+    ensureTransformRowPresence();
+  });
+
+  transformationsList.appendChild(row);
+
+  if (!(data.name || data.template)) {
+    const focusField = () => nameInput.focus();
+    if (typeof queueMicrotask === "function") {
+      queueMicrotask(focusField);
+    } else {
+      setTimeout(focusField, 0);
+    }
+  }
+}
+
+function clearTransformations() {
+  if (!transformationsList) {
+    return;
+  }
+  transformationsList.innerHTML = "";
+}
+
+function ensureTransformRowPresence() {
+  if (!transformationsList) {
+    return;
+  }
+  if (!transformationsList.querySelector(".transform-row")) {
+    addTransformationRow();
+  }
+}
+
+function collectTransformations() {
+  if (!transformationsList) {
+    return [];
+  }
+  const rows = Array.from(transformationsList.querySelectorAll(".transform-row"));
+  return rows
+    .map((row) => {
+      const nameInput = row.querySelector("[data-transform-name]");
+      const templateInput = row.querySelector("[data-transform-template]");
+      return toTransformation({
+        name: nameInput.value,
+        template: templateInput.value,
+      });
+    })
+    .filter(Boolean);
+}
+
+function toTransformation(input) {
+  if (typeof input === "string") {
+    const template = input.trim();
+    if (!template) {
+      return null;
+    }
+    return { name: template, template };
+  }
+
+  if (!input || typeof input.template !== "string") {
+    return null;
+  }
+
+  const template = input.template.trim();
+  if (!template) {
+    return null;
+  }
+
+  const name = typeof input.name === "string" && input.name.trim().length > 0 ? input.name.trim() : template;
+  return { name, template };
+}
+
+function upgradeRule(rule) {
+  if (!rule || typeof rule.pattern !== "string") {
+    return null;
+  }
+
+  const pattern = rule.pattern.trim();
+  if (!pattern) {
+    return null;
+  }
+
+  const type = rule.type === "regex" ? "regex" : "string";
+  const transformations = Array.isArray(rule.transformations)
+    ? rule.transformations.map(toTransformation).filter(Boolean)
+    : [];
+
+  if (!transformations.length) {
+    return null;
+  }
+
+  return { pattern, type, transformations };
 }
 
 function onExport() {
@@ -331,32 +488,12 @@ async function onImport(event) {
 
 function normaliseImportedData(data) {
   if (Array.isArray(data)) {
-    return data.filter(isValidRuleShape);
+    return data.map(upgradeRule).filter(Boolean);
   }
   if (data && Array.isArray(data.paths)) {
-    return data.paths.filter(isValidRuleShape);
+    return data.paths.map(upgradeRule).filter(Boolean);
   }
   return [];
-}
-
-function isValidRuleShape(rule) {
-  return (
-    rule &&
-    typeof rule.pattern === "string" &&
-    (rule.type === "regex" || rule.type === "string") &&
-    Array.isArray(rule.transformations) &&
-    rule.transformations.every((tpl) => typeof tpl === "string")
-  );
-}
-
-function escapeHtml(value) {
-  const input = String(value ?? "");
-  return input
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 function showFormStatus(message) {

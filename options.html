@@ -28,9 +28,12 @@
           </select>
         </div>
         <div class="form__group">
-          <label for="transformations">Transformations</label>
-          <textarea id="transformations" name="transformations" rows="5" placeholder="One URL template per line"></textarea>
-          <p class="form__hint">Regex templates support <code>\1</code>, <code>\2</code>, etc. String templates support <code>{{url}}</code> and <code>{{pattern}}</code>.</p>
+          <label for="transformationsList">Transformations</label>
+          <div class="transforms">
+            <div id="transformationsList" class="transforms__list" aria-live="polite"></div>
+            <button id="addTransformation" class="secondary transforms__add" type="button">Add transformation</button>
+          </div>
+          <p class="form__hint">Give each destination a friendly name. Regex templates support <code>\1</code>, <code>\2</code>, etc. String templates support <code>{{url}}</code> and <code>{{pattern}}</code>.</p>
         </div>
         <fieldset class="form__test">
           <legend>Test rule</legend>
@@ -78,6 +81,15 @@
       </div>
     </section>
   </main>
+  <template id="transformRowTemplate">
+    <div class="transform-row">
+      <div class="transform-row__fields">
+        <input type="text" class="transform-row__input" data-transform-name placeholder="Name (shown in popup)">
+  <input type="text" class="transform-row__input" data-transform-template placeholder="Destination URL template">
+      </div>
+      <button type="button" class="transform-row__remove secondary" data-remove-transform>Remove</button>
+    </div>
+  </template>
   <script src="options.js"></script>
 </body>
 </html>

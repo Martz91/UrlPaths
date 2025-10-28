@@ -22,7 +22,9 @@ async function initPopup() {
     currentTab = tab;
 
     const stored = await storageGet({ paths: [] });
-    const paths = Array.isArray(stored.paths) ? stored.paths.filter(isValidRuleShape) : [];
+    const paths = Array.isArray(stored.paths)
+      ? stored.paths.map(upgradeRule).filter(Boolean)
+      : [];
     if (paths.length === 0) {
       statusEl.textContent = "No rules configured yet.";
       return;
@@ -57,7 +59,15 @@ function collectMatches(paths, url) {
 }
 
 function resolveTransformations(rule, url) {
-  if (!rule || typeof rule.pattern !== "string" || !Array.isArray(rule.transformations)) {
+  if (!rule || typeof rule.pattern !== "string") {
+    return null;
+  }
+
+  const transformations = Array.isArray(rule.transformations)
+    ? rule.transformations.map(toTransformation).filter(Boolean)
+    : [];
+
+  if (!transformations.length) {
     return null;
   }
 
@@ -69,19 +79,24 @@ function resolveTransformations(rule, url) {
       console.warn("Invalid regex pattern", rule.pattern, error);
       return null;
     }
+
     const match = url.match(regex);
     if (!match) {
       return null;
     }
-    return rule.transformations
-      .filter((tpl) => typeof tpl === "string" && tpl.length > 0)
-      .map((tpl) => ({
-        template: tpl,
-        target: tpl.replace(/\\(\d+)/g, (full, group) => {
+
+    return transformations
+      .map(({ name, template }) => {
+        const target = template.replace(/\\(\d+)/g, (full, group) => {
           const groupIndex = Number(group);
           return match[groupIndex] ?? "";
-        }),
-      }))
+        });
+        return {
+          name: name || target,
+          template,
+          target,
+        };
+      })
       .filter((item) => item.target && isLikelyUrl(item.target));
   }
 
@@ -89,14 +104,17 @@ function resolveTransformations(rule, url) {
     return null;
   }
 
-  return rule.transformations
-    .filter((tpl) => typeof tpl === "string" && tpl.length > 0)
-    .map((tpl) => ({
-      template: tpl,
-      target: tpl
+  return transformations
+    .map(({ name, template }) => {
+      const target = template
         .replace(/\{\{\s*url\s*\}\}/gi, url)
-        .replace(/\{\{\s*pattern\s*\}\}/gi, rule.pattern),
-    }))
+        .replace(/\{\{\s*pattern\s*\}\}/gi, rule.pattern);
+      return {
+        name: name || target,
+        template,
+        target,
+      };
+    })
     .filter((item) => item.target && isLikelyUrl(item.target));
 }
 
@@ -113,8 +131,16 @@ function renderMatch(match) {
   transformations.forEach((item) => {
     const transformNode = transformTemplate.content.cloneNode(true);
     const button = transformNode.querySelector(".match__button");
-    button.textContent = item.target;
-    button.title = item.template;
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "match__button-name";
+    nameSpan.textContent = item.name || item.target;
+
+    const urlSpan = document.createElement("span");
+    urlSpan.className = "match__button-url";
+    urlSpan.textContent = item.target;
+
+  button.replaceChildren(nameSpan, urlSpan);
+  button.title = item.template === item.target ? item.target : `${item.target}\nTemplate: ${item.template}`;
     button.dataset.targetUrl = item.target;
 
     button.addEventListener("click", (event) => {
@@ -159,14 +185,48 @@ function isLikelyUrl(value) {
   }
 }
 
-function isValidRuleShape(rule) {
-  return (
-    rule &&
-    typeof rule.pattern === "string" &&
-    (rule.type === "regex" || rule.type === "string") &&
-    Array.isArray(rule.transformations) &&
-    rule.transformations.every((tpl) => typeof tpl === "string")
-  );
+function toTransformation(input) {
+  if (typeof input === "string") {
+    const template = input.trim();
+    if (!template) {
+      return null;
+    }
+    return { name: template, template };
+  }
+
+  if (!input || typeof input.template !== "string") {
+    return null;
+  }
+
+  const template = input.template.trim();
+  if (!template) {
+    return null;
+  }
+
+  const name = typeof input.name === "string" && input.name.trim().length > 0 ? input.name.trim() : template;
+  return { name, template };
+}
+
+function upgradeRule(rule) {
+  if (!rule || typeof rule.pattern !== "string") {
+    return null;
+  }
+
+  const pattern = rule.pattern.trim();
+  if (!pattern) {
+    return null;
+  }
+
+  const type = rule.type === "regex" ? "regex" : "string";
+  const transformations = Array.isArray(rule.transformations)
+    ? rule.transformations.map(toTransformation).filter(Boolean)
+    : [];
+
+  if (!transformations.length) {
+    return null;
+  }
+
+  return { pattern, type, transformations };
 }
 
 function storageGet(keys) {

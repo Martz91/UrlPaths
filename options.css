@@ -93,6 +93,44 @@ label {
   font-weight: 600;
 }
 
+.transforms {
+  display: grid;
+  gap: 12px;
+}
+
+.transforms__list {
+  display: grid;
+  gap: 12px;
+}
+
+.transform-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.transform-row__fields {
+  flex: 1;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.transform-row__input {
+  width: 100%;
+  min-width: 0;
+}
+
+.transform-row__remove {
+  align-self: center;
+  height: fit-content;
+}
+
+.transforms__add {
+  justify-self: flex-start;
+}
+
 input[type="text"],
 input[type="url"],
 select,
@@ -212,6 +250,21 @@ button.secondary {
   padding-left: 20px;
   display: grid;
   gap: 6px;
+}
+
+.rule-card__transform {
+  display: grid;
+  gap: 4px;
+}
+
+.rule-card__transform-name {
+  font-weight: 600;
+}
+
+.rule-card__transform-template {
+  font-size: 0.85rem;
+  color: var(--muted);
+  word-break: break-all;
 }
 
 .rule-card__actions {
