@@ -125,8 +125,9 @@ function renderMatch(match) {
   const source = fragment.querySelector(".match__source");
   const list = fragment.querySelector(".match__list");
 
-  title.textContent = rule.pattern;
-  source.textContent = rule.type === "regex" ? "Regex rule" : "String rule";
+  title.textContent = rule.name || rule.pattern;
+  const ruleKind = rule.type === "regex" ? "Regex" : "String";
+  source.textContent = `${ruleKind} rule · ${rule.pattern}`;
 
   transformations.forEach((item) => {
     const transformNode = transformTemplate.content.cloneNode(true);
@@ -139,8 +140,8 @@ function renderMatch(match) {
     urlSpan.className = "match__button-url";
     urlSpan.textContent = item.target;
 
-  button.replaceChildren(nameSpan, urlSpan);
-  button.title = item.template === item.target ? item.target : `${item.target}\nTemplate: ${item.template}`;
+    button.replaceChildren(nameSpan, urlSpan);
+    button.title = item.template === item.target ? item.target : `${item.target}\nTemplate: ${item.template}`;
     button.dataset.targetUrl = item.target;
 
     button.addEventListener("click", (event) => {
@@ -217,6 +218,7 @@ function upgradeRule(rule) {
     return null;
   }
 
+  const name = typeof rule.name === "string" && rule.name.trim().length > 0 ? rule.name.trim() : pattern;
   const type = rule.type === "regex" ? "regex" : "string";
   const transformations = Array.isArray(rule.transformations)
     ? rule.transformations.map(toTransformation).filter(Boolean)
@@ -226,7 +228,7 @@ function upgradeRule(rule) {
     return null;
   }
 
-  return { pattern, type, transformations };
+  return { name, pattern, type, transformations };
 }
 
 function storageGet(keys) {

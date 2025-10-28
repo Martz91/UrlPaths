@@ -1,5 +1,6 @@
 const ruleForm = document.getElementById("ruleForm");
 const ruleIndexField = document.getElementById("ruleIndex");
+const ruleNameInput = document.getElementById("ruleName");
 const patternInput = document.getElementById("pattern");
 const typeSelect = document.getElementById("type");
 const transformationsList = document.getElementById("transformationsList");
@@ -55,6 +56,7 @@ async function persistPaths(message) {
 
 async function onSaveRule(event) {
   event.preventDefault();
+  const name = ruleNameInput ? ruleNameInput.value.trim() : "";
   const pattern = patternInput.value.trim();
   const type = typeSelect.value === "regex" ? "regex" : "string";
   const transformations = collectTransformations();
@@ -70,7 +72,7 @@ async function onSaveRule(event) {
   }
 
   const indexValue = ruleIndexField.value;
-  const rule = { pattern, type, transformations };
+  const rule = { name, pattern, type, transformations };
   const upgradedRule = upgradeRule(rule);
 
   if (!upgradedRule) {
@@ -100,6 +102,9 @@ function resetForm() {
   ruleForm.reset();
   ruleIndexField.value = "";
   typeSelect.value = "string";
+  if (ruleNameInput) {
+    ruleNameInput.value = "";
+  }
   clearTransformations();
   addTransformationRow();
   testResultsList.innerHTML = "";
@@ -123,15 +128,23 @@ function renderRules() {
     const meta = document.createElement("div");
     meta.className = "rule-card__meta";
 
-    const patternEl = document.createElement("span");
-    patternEl.className = "rule-card__pattern";
-    patternEl.textContent = rule.pattern;
+  const nameEl = document.createElement("span");
+  nameEl.className = "rule-card__name";
+  nameEl.textContent = rule.name || rule.pattern;
 
-    const typeChip = document.createElement("span");
-    typeChip.className = "rule-card__type";
-    typeChip.textContent = rule.type === "regex" ? "Regex" : "String";
+  const details = document.createElement("div");
+  details.className = "rule-card__details";
 
-    meta.append(patternEl, typeChip);
+  const patternEl = document.createElement("code");
+  patternEl.className = "rule-card__pattern";
+  patternEl.textContent = rule.pattern;
+
+  const typeChip = document.createElement("span");
+  typeChip.className = "rule-card__type";
+  typeChip.textContent = rule.type === "regex" ? "Regex" : "String";
+
+  details.append(patternEl, typeChip);
+  meta.append(nameEl, details);
 
     const list = document.createElement("ol");
     list.className = "rule-card__list";
@@ -173,6 +186,9 @@ function renderRules() {
 }
 
 function populateForm(rule, index) {
+  if (ruleNameInput) {
+    ruleNameInput.value = rule.name && rule.name !== rule.pattern ? rule.name : "";
+  }
   patternInput.value = rule.pattern;
   typeSelect.value = rule.type === "regex" ? "regex" : "string";
   clearTransformations();
@@ -185,7 +201,8 @@ function populateForm(rule, index) {
 
 async function deleteRule(index) {
   const rule = paths[index];
-  const confirmed = window.confirm(`Delete rule "${rule.pattern}"?`);
+  const label = rule.name || rule.pattern;
+  const confirmed = window.confirm(`Delete rule "${label}"?`);
   if (!confirmed) {
     return;
   }
@@ -210,6 +227,7 @@ function onTestRule() {
   }
 
   const rule = {
+    name: ruleNameInput ? ruleNameInput.value.trim() : "",
     pattern: patternInput.value.trim(),
     type: typeSelect.value === "regex" ? "regex" : "string",
     transformations: collectTransformations(),
@@ -429,6 +447,7 @@ function upgradeRule(rule) {
     return null;
   }
 
+  const name = typeof rule.name === "string" && rule.name.trim().length > 0 ? rule.name.trim() : pattern;
   const type = rule.type === "regex" ? "regex" : "string";
   const transformations = Array.isArray(rule.transformations)
     ? rule.transformations.map(toTransformation).filter(Boolean)
@@ -438,7 +457,7 @@ function upgradeRule(rule) {
     return null;
   }
 
-  return { pattern, type, transformations };
+  return { name, pattern, type, transformations };
 }
 
 function onExport() {

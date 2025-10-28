@@ -83,6 +83,7 @@ body {
   margin: 0;
   font-size: 0.85rem;
   color: rgba(99, 102, 241, 0.9);
+  word-break: break-word;
 }
 
 .match__list {

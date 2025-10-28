@@ -16,6 +16,11 @@
       <form id="ruleForm" class="form" autocomplete="off">
         <input type="hidden" id="ruleIndex" value="">
         <div class="form__group">
+          <label for="ruleName">Rule name</label>
+          <input id="ruleName" name="ruleName" type="text" placeholder="Example: SharePoint shortcuts">
+          <p class="form__hint">Optional. Shown in the popup. Defaults to the pattern when left blank.</p>
+        </div>
+        <div class="form__group">
           <label for="pattern">Pattern</label>
           <input id="pattern" name="pattern" type="text" required placeholder="Example: https://([a-z0-9-]+)\\.sharepoint\\.com/sites/([^/]+)">
           <p class="form__hint">Select string match for simple substring detection or regex for capture groups.</p>
