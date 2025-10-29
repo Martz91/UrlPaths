@@ -11,6 +11,9 @@ manageBtn.addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
 });
 
+/**
+ * Initializes the popup by loading stored rules, resolving matches, and rendering the UI.
+ */
 async function initPopup() {
   statusEl.textContent = "Loading rules...";
   try {
@@ -46,6 +49,12 @@ async function initPopup() {
   }
 }
 
+/**
+ * Collects rule matches for the given URL and returns transformation metadata.
+ * @param {Array<Object>} paths - The stored rule definitions.
+ * @param {string} url - The current tab URL to evaluate.
+ * @returns {Array<Object>} Matched rules with their applicable transformations.
+ */
 function collectMatches(paths, url) {
   return paths
     .map((rule, index) => {
@@ -58,6 +67,12 @@ function collectMatches(paths, url) {
     .filter(Boolean);
 }
 
+/**
+ * Resolves transformations for a rule against a URL and returns valid targets.
+ * @param {Object} rule - The rule definition.
+ * @param {string} url - The URL to test against the rule pattern.
+ * @returns {Array<Object>|null} Transformation targets or null when none match.
+ */
 function resolveTransformations(rule, url) {
   if (!rule || typeof rule.pattern !== "string") {
     return null;
@@ -118,6 +133,10 @@ function resolveTransformations(rule, url) {
     .filter((item) => item.target && isLikelyUrl(item.target));
 }
 
+/**
+ * Renders a matched rule and its transformations into the popup UI.
+ * @param {Object} match - The rule match data containing the rule and transformations.
+ */
 function renderMatch(match) {
   const { rule, transformations } = match;
   const fragment = matchTemplate.content.cloneNode(true);
@@ -162,6 +181,12 @@ function renderMatch(match) {
   matchesContainer.appendChild(fragment);
 }
 
+/**
+ * Opens the target URL either in the current tab or a new tab.
+ * @param {string} targetUrl - The URL to open.
+ * @param {boolean} openInNewTab - Whether to open the URL in a new tab.
+ * @param {boolean} [makeActive=true] - Whether the new tab should become active.
+ */
 function openUrl(targetUrl, openInNewTab, makeActive = true) {
   if (!currentTab) {
     return;
@@ -177,6 +202,11 @@ function openUrl(targetUrl, openInNewTab, makeActive = true) {
   window.close();
 }
 
+/**
+ * Determines if a value can be parsed as a valid URL.
+ * @param {string} value - The string to validate.
+ * @returns {boolean} True when the value is a valid URL.
+ */
 function isLikelyUrl(value) {
   try {
     new URL(value);
@@ -186,6 +216,11 @@ function isLikelyUrl(value) {
   }
 }
 
+/**
+ * Normalizes transformation input into a consistent object representation.
+ * @param {string|Object} input - The transformation configuration.
+ * @returns {{name: string, template: string}|null} A normalized transformation or null.
+ */
 function toTransformation(input) {
   if (typeof input === "string") {
     const template = input.trim();
@@ -208,6 +243,11 @@ function toTransformation(input) {
   return { name, template };
 }
 
+/**
+ * Upgrades and validates a stored rule, ensuring required properties are present.
+ * @param {Object} rule - The persisted rule data.
+ * @returns {{name: string, pattern: string, type: string, transformations: Array<Object>}|null}
+ */
 function upgradeRule(rule) {
   if (!rule || typeof rule.pattern !== "string") {
     return null;
@@ -231,6 +271,11 @@ function upgradeRule(rule) {
   return { name, pattern, type, transformations };
 }
 
+/**
+ * Promisified helper around chrome.storage.sync.get.
+ * @param {Object} keys - The keys or defaults to retrieve from storage.
+ * @returns {Promise<Object>} Resolved storage values.
+ */
 function storageGet(keys) {
   return new Promise((resolve, reject) => {
     chrome.storage.sync.get(keys, (result) => {

@@ -22,7 +22,7 @@
         </div>
         <div class="form__group">
           <label for="pattern">Pattern</label>
-          <input id="pattern" name="pattern" type="text" required placeholder="Example: https://([a-z0-9-]+)\\.sharepoint\\.com/sites/([^/]+)">
+          <input id="pattern" name="pattern" type="text" required placeholder="Example: https:\/\/([a-zA-Z0-9-]+)\\.sharepoint\\.com\/sites\/([a-zA-Z0-9-]+)">
           <p class="form__hint">Select string match for simple substring detection or regex for capture groups.</p>
         </div>
         <div class="form__group form__group--inline">
@@ -90,7 +90,7 @@
     <div class="transform-row">
       <div class="transform-row__fields">
         <input type="text" class="transform-row__input" data-transform-name placeholder="Name (shown in popup)">
-  <input type="text" class="transform-row__input" data-transform-template placeholder="Destination URL template">
+  <input type="text" class="transform-row__input" data-transform-template placeholder="Example: https://\1.sharepoint.com/sites/\2/_layouts/15/viewlsts.aspx">
       </div>
       <button type="button" class="transform-row__remove secondary" data-remove-transform>Remove</button>
     </div>
