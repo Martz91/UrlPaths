@@ -7,94 +7,84 @@
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
-  <main class="layout">
-    <section class="panel">
-      <header class="panel__header">
-        <h1 class="panel__title">URL Paths</h1>
-        <p class="panel__subtitle">Create reusable URL transformations and jump to related pages faster.</p>
-      </header>
-      <form id="ruleForm" class="form" autocomplete="off">
-        <input type="hidden" id="ruleIndex" value="">
-        <div class="form__group">
-          <label for="ruleName">Rule name</label>
-          <input id="ruleName" name="ruleName" type="text" placeholder="Example: SharePoint shortcuts">
-          <p class="form__hint">Optional. Shown in the popup. Defaults to the pattern when left blank.</p>
+  <header class="app-header">
+    <h1 class="app-header__title">UrlPaths Options</h1>
+    <span class="app-header__version">v1.0.0</span>
+  </header>
+  
+  <main class="app-layout">
+    <aside class="rules-panel">
+      <div class="rules-panel__header">
+        <h2>Rules</h2>
+        <button id="addNewRule" type="button" class="btn-primary">Add New</button>
+      </div>
+      <div id="rulesList" class="rules-list"></div>
+    </aside>
+    
+    <section class="details-panel">
+      <div id="ruleDetails" class="rule-details">
+        <div class="rule-details__empty">
+          <p>Select a rule from the list to view details, or create a new rule.</p>
         </div>
-        <div class="form__group">
-          <label for="pattern">Pattern</label>
-          <input id="pattern" name="pattern" type="text" required placeholder="Example: https:\/\/([a-zA-Z0-9-]+)\\.sharepoint\\.com\/sites\/([a-zA-Z0-9-]+)">
-          <p class="form__hint">Select string match for simple substring detection or regex for capture groups.</p>
-        </div>
-        <div class="form__group form__group--inline">
-          <label for="type">Match type</label>
-          <select id="type" name="type">
-            <option value="string">String</option>
-            <option value="regex">Regex</option>
-          </select>
-        </div>
-        <div class="form__group">
-          <label for="transformationsList">Transformations</label>
-          <div class="transforms">
-            <div id="transformationsList" class="transforms__list" aria-live="polite"></div>
-            <button id="addTransformation" class="secondary transforms__add" type="button">Add transformation</button>
-          </div>
-          <p class="form__hint">Give each destination a friendly name. Regex templates support <code>\1</code>, <code>\2</code>, etc. String templates support <code>{{url}}</code> and <code>{{pattern}}</code>.</p>
-        </div>
-        <fieldset class="form__test">
-          <legend>Test rule</legend>
-          <div class="form__group">
-            <label for="sampleUrl">Sample URL</label>
-            <input id="sampleUrl" type="url" placeholder="Paste a URL to test the rule">
-          </div>
-          <div class="form__actions form__actions--test">
-            <button id="testRule" type="button">Test</button>
-            <span id="testStatus" class="status"></span>
-          </div>
-          <ul id="testResults" class="test-results"></ul>
-        </fieldset>
-        <div class="form__actions">
-          <button id="saveRule" type="submit">Save rule</button>
-          <button id="resetForm" type="button">Reset</button>
-        </div>
-        <p id="formStatus" class="status"></p>
-      </form>
-    </section>
-    <section class="panel">
-      <header class="panel__header">
-        <h2 class="panel__title">Saved rules</h2>
-        <p class="panel__subtitle">Edit or delete existing rules. Rules sync across devices.</p>
-      </header>
-      <div id="rulesList" class="rules"></div>
-    </section>
-    <section class="panel">
-      <header class="panel__header">
-        <h2 class="panel__title">Import &amp; Export</h2>
-        <p class="panel__subtitle">Backup rules or share them with teammates.</p>
-      </header>
-      <div class="import">
-        <label class="import__mode" for="importMode">Import mode</label>
-        <select id="importMode">
-          <option value="merge">Merge with existing</option>
-          <option value="replace">Replace existing</option>
-        </select>
-        <div class="import__actions">
-          <button id="importBtn" type="button">Import JSON</button>
-          <button id="exportBtn" type="button">Export JSON</button>
-        </div>
-        <input id="importFile" type="file" accept="application/json,.json" hidden>
-        <p class="form__hint">Imported JSON should be an array of rule objects matching the structure above.</p>
       </div>
     </section>
   </main>
+  
+  <footer class="test-section">
+    <h3>Test Rule</h3>
+    <div class="test-form">
+      <div class="test-form__group">
+        <label for="testInput">Test URL:</label>
+        <input id="testInput" type="url" placeholder="Enter a URL to test">
+      </div>
+      <div class="test-form__group">
+        <label for="testOutput">Result:</label>
+        <div id="testOutput" class="test-output">Enter a URL above to see the result</div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Hidden form for editing rules -->
+  <form id="ruleForm" class="rule-form" style="display: none;">
+    <input type="hidden" id="ruleIndex" value="">
+    <div class="form-group">
+      <label for="ruleName">Rule Name:</label>
+      <input id="ruleName" name="ruleName" type="text" required>
+    </div>
+    <div class="form-group">
+      <label for="pattern">Pattern:</label>
+      <input id="pattern" name="pattern" type="text" required>
+    </div>
+    <div class="form-group">
+      <label for="type">Match Type:</label>
+      <select id="type" name="type">
+        <option value="string">String</option>
+        <option value="regex">Regex</option>
+      </select>
+    </div>
+  </form>
+
+  <!-- Template for transformation rows -->
   <template id="transformRowTemplate">
     <div class="transform-row">
-      <div class="transform-row__fields">
-        <input type="text" class="transform-row__input" data-transform-name placeholder="Name (shown in popup)">
-  <input type="text" class="transform-row__input" data-transform-template placeholder="Example: https://\1.sharepoint.com/sites/\2/_layouts/15/viewlsts.aspx">
+      <div class="transform-row__content">
+        <span class="transform-name" data-transform-name></span>
+        <span class="transform-template" data-transform-template></span>
       </div>
-      <button type="button" class="transform-row__remove secondary" data-remove-transform>Remove</button>
+      <div class="transform-row__actions">
+        <button type="button" class="btn-secondary btn-small" data-edit-transform>Edit</button>
+        <button type="button" class="btn-danger btn-small" data-remove-transform>Delete</button>
+      </div>
     </div>
   </template>
+
+  <!-- Import/Export (hidden file input) -->
+  <input id="importFile" type="file" accept="application/json,.json" style="display: none;">
+  <select id="importMode" style="display: none;">
+    <option value="merge">Merge with existing</option>
+    <option value="replace">Replace existing</option>
+  </select>
+
   <script src="options.js"></script>
 </body>
 </html>

@@ -1,41 +1,34 @@
+// DOM elements
+const rulesList = document.getElementById("rulesList");
+const ruleDetails = document.getElementById("ruleDetails");
+const addNewRuleBtn = document.getElementById("addNewRule");
+const testInput = document.getElementById("testInput");
+const testOutput = document.getElementById("testOutput");
 const ruleForm = document.getElementById("ruleForm");
 const ruleIndexField = document.getElementById("ruleIndex");
 const ruleNameInput = document.getElementById("ruleName");
 const patternInput = document.getElementById("pattern");
 const typeSelect = document.getElementById("type");
-const transformationsList = document.getElementById("transformationsList");
-const addTransformationBtn = document.getElementById("addTransformation");
 const transformRowTemplate = document.getElementById("transformRowTemplate");
-const sampleUrlInput = document.getElementById("sampleUrl");
-const testButton = document.getElementById("testRule");
-const testResultsList = document.getElementById("testResults");
-const testStatus = document.getElementById("testStatus");
-const formStatus = document.getElementById("formStatus");
-const resetButton = document.getElementById("resetForm");
-const rulesList = document.getElementById("rulesList");
-const importBtn = document.getElementById("importBtn");
-const exportBtn = document.getElementById("exportBtn");
 const importFile = document.getElementById("importFile");
 const importMode = document.getElementById("importMode");
 
 let paths = [];
-let statusTimer = null;
+let currentRuleIndex = -1;
+let isEditMode = false;
 
+// Event listeners
 document.addEventListener("DOMContentLoaded", init);
-ruleForm.addEventListener("submit", onSaveRule);
-resetButton.addEventListener("click", resetForm);
-testButton.addEventListener("click", onTestRule);
-importBtn.addEventListener("click", () => importFile.click());
-exportBtn.addEventListener("click", onExport);
-importFile.addEventListener("change", onImport);
-if (addTransformationBtn) {
-  addTransformationBtn.addEventListener("click", () => addTransformationRow());
+addNewRuleBtn.addEventListener("click", createNewRule);
+testInput.addEventListener("input", onTestInputChange);
+if (ruleForm) {
+  ruleForm.addEventListener("submit", onSaveRule);
 }
 
 async function init() {
   await loadPaths();
-  renderRules();
-  resetForm();
+  renderRulesList();
+  showEmptyState();
 }
 
 async function loadPaths() {
@@ -45,374 +38,578 @@ async function loadPaths() {
     : [];
 }
 
-async function persistPaths(message) {
+async function persistPaths() {
   paths = paths.map(upgradeRule).filter(Boolean);
   await storageSet({ paths });
-  if (message) {
-    showFormStatus(message);
-  }
-  renderRules();
+  renderRulesList();
 }
 
-async function onSaveRule(event) {
-  event.preventDefault();
-  const name = ruleNameInput ? ruleNameInput.value.trim() : "";
-  const pattern = patternInput.value.trim();
-  const type = typeSelect.value === "regex" ? "regex" : "string";
-  const transformations = collectTransformations();
-
-  if (!pattern) {
-    showFormStatus("Pattern is required.");
-    return;
-  }
-
-  if (transformations.length === 0) {
-    showFormStatus("Add at least one transformation.");
-    return;
-  }
-
-  const indexValue = ruleIndexField.value;
-  const rule = { name, pattern, type, transformations };
-  const upgradedRule = upgradeRule(rule);
-
-  if (!upgradedRule) {
-    showFormStatus("Unable to save rule. Check the inputs.");
-    return;
-  }
-
-  try {
-    if (indexValue) {
-      const index = Number(indexValue);
-      if (Number.isInteger(index) && index >= 0 && index < paths.length) {
-        paths[index] = upgradedRule;
-        await persistPaths("Rule updated.");
-      }
-    } else {
-      paths.push(upgradedRule);
-      await persistPaths("Rule saved.");
-    }
-    resetForm();
-  } catch (error) {
-    console.error("Failed to save rule", error);
-    showFormStatus("Unable to persist rules. Try again.");
-  }
-}
-
-function resetForm() {
-  ruleForm.reset();
-  ruleIndexField.value = "";
-  typeSelect.value = "string";
-  if (ruleNameInput) {
-    ruleNameInput.value = "";
-  }
-  clearTransformations();
-  addTransformationRow();
-  testResultsList.innerHTML = "";
-  testStatus.textContent = "";
-}
-
-function renderRules() {
+function renderRulesList() {
   rulesList.innerHTML = "";
+  
   if (!paths.length) {
-    const empty = document.createElement("p");
-    empty.className = "form__hint";
-    empty.textContent = "No rules saved yet.";
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "No rules created yet.";
     rulesList.appendChild(empty);
     return;
   }
 
   paths.forEach((rule, index) => {
-    const card = document.createElement("article");
-    card.className = "rule-card";
+    const item = document.createElement("div");
+    item.className = "rule-item";
+    if (index === currentRuleIndex) {
+      item.classList.add("active");
+    }
+    
+    const name = document.createElement("div");
+    name.className = "rule-item__name";
+    name.textContent = rule.name || rule.pattern;
+    
+    //const pattern = document.createElement("div");
+    //pattern.className = "rule-item__pattern";
+    //pattern.textContent = rule.pattern;
+    
+    item.appendChild(name);
+    //item.appendChild(pattern);
+    
+    item.addEventListener("click", () => selectRule(index));
+    rulesList.appendChild(item);
+  });
+}
 
-    const meta = document.createElement("div");
-    meta.className = "rule-card__meta";
+function selectRule(index) {
+  currentRuleIndex = index;
+  isEditMode = false;
+  renderRulesList(); // Update active state
+  renderRuleDetails(paths[index]);
+}
 
-  const nameEl = document.createElement("span");
-  nameEl.className = "rule-card__name";
-  nameEl.textContent = rule.name || rule.pattern;
+function renderRuleDetails(rule) {
+  if (!rule) {
+    showEmptyState();
+    return;
+  }
 
-  const details = document.createElement("div");
-  details.className = "rule-card__details";
-
-  const patternEl = document.createElement("code");
-  patternEl.className = "rule-card__pattern";
-  patternEl.textContent = rule.pattern;
-
-  const typeChip = document.createElement("span");
-  typeChip.className = "rule-card__type";
-  typeChip.textContent = rule.type === "regex" ? "Regex" : "String";
-
-  details.append(patternEl, typeChip);
-  meta.append(nameEl, details);
-
-    const list = document.createElement("ol");
-    list.className = "rule-card__list";
-    rule.transformations.forEach((transform) => {
-      const item = document.createElement("li");
-      item.className = "rule-card__transform";
-
-      const nameEl = document.createElement("span");
-      nameEl.className = "rule-card__transform-name";
-      nameEl.textContent = transform.name || transform.template;
-
-      const templateEl = document.createElement("span");
-      templateEl.className = "rule-card__transform-template";
-      templateEl.textContent = transform.template;
-
-      item.append(nameEl, templateEl);
-      list.appendChild(item);
+  const detailsContainer = document.createElement("div");
+  
+  // Header
+  const header = document.createElement("div");
+  header.className = "rule-details__header";
+  
+  const title = document.createElement("h2");
+  title.className = "rule-details__title";
+  title.textContent = rule.name || rule.pattern;
+  
+  const actions = document.createElement("div");
+  actions.className = "rule-details__actions";
+  
+  const editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.className = "btn-secondary";
+  editBtn.textContent = "Edit";
+  editBtn.addEventListener("click", editRule);
+  
+  const deleteBtn = document.createElement("button");
+  deleteBtn.type = "button";
+  deleteBtn.className = "btn-danger";
+  deleteBtn.textContent = "Delete";
+  deleteBtn.addEventListener("click", deleteCurrentRule);
+  
+  actions.appendChild(editBtn);
+  actions.appendChild(deleteBtn);
+  header.appendChild(title);
+  header.appendChild(actions);
+  
+  // Content
+  const content = document.createElement("div");
+  content.className = "rule-details__content";
+  
+  // Rule details
+  const nameGroup = createDetailGroup("Rule Name", rule.name || "No name set");
+  const patternGroup = createDetailGroup("Pattern", rule.pattern, true);
+  const typeGroup = createDetailGroup("Match Type", rule.type === "regex" ? "Regular Expression" : "String Match");
+  
+  content.appendChild(nameGroup);
+  content.appendChild(patternGroup);
+  content.appendChild(typeGroup);
+  
+  // Transformations section
+  const transformationsSection = document.createElement("div");
+  transformationsSection.className = "transformations-section";
+  
+  const transformationsHeader = document.createElement("div");
+  transformationsHeader.className = "transformations-header";
+  
+  const transformationsTitle = document.createElement("h3");
+  transformationsTitle.textContent = `Transformations (${rule.transformations.length})`;
+  
+  const addTransformBtn = document.createElement("button");
+  addTransformBtn.type = "button";
+  addTransformBtn.className = "btn-primary btn-small";
+  addTransformBtn.textContent = "Add Transformation";
+  addTransformBtn.addEventListener("click", () => {
+    if (!isEditMode) {
+      editRule();
+    } else {
+      addTransformation();
+    }
+  });
+  
+  transformationsHeader.appendChild(transformationsTitle);
+  transformationsHeader.appendChild(addTransformBtn);
+  
+  const transformationsList = document.createElement("div");
+  transformationsList.className = "transformations-list";
+  transformationsList.id = "transformationsList";
+  
+  if (rule.transformations.length === 0) {
+    const emptyState = document.createElement("div");
+    emptyState.className = "empty-state";
+    emptyState.textContent = "No transformations added yet.";
+    transformationsList.appendChild(emptyState);
+  } else {
+    rule.transformations.forEach((transform, index) => {
+      const transformRow = createTransformationRow(transform, index, false);
+      transformationsList.appendChild(transformRow);
     });
+  }
+  
+  transformationsSection.appendChild(transformationsHeader);
+  transformationsSection.appendChild(transformationsList);
+  content.appendChild(transformationsSection);
+  
+  detailsContainer.appendChild(header);
+  detailsContainer.appendChild(content);
+  
+  ruleDetails.innerHTML = "";
+  ruleDetails.appendChild(detailsContainer);
+}
 
-    const actions = document.createElement("div");
-    actions.className = "rule-card__actions";
+function createDetailGroup(label, value, isCode = false) {
+  const group = document.createElement("div");
+  group.className = "detail-group";
+  
+  const labelEl = document.createElement("div");
+  labelEl.className = "detail-label";
+  labelEl.textContent = label;
+  
+  const valueEl = document.createElement("div");
+  valueEl.className = isCode ? "detail-value code" : "detail-value";
+  valueEl.textContent = value;
+  
+  group.appendChild(labelEl);
+  group.appendChild(valueEl);
+  
+  return group;
+}
 
-    const editBtn = document.createElement("button");
-    editBtn.type = "button";
-    editBtn.className = "secondary";
-    editBtn.textContent = "Edit";
-    editBtn.addEventListener("click", () => populateForm(rule, index));
-
+function createTransformationRow(transform, index, isEditable) {
+  const row = document.createElement("div");
+  row.className = "transform-row";
+  
+  const content = document.createElement("div");
+  content.className = "transform-row__content";
+  
+  if (isEditable) {
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.className = "transform-name-input";
+    nameInput.value = transform.name || "";
+    nameInput.placeholder = "Transformation name";
+    nameInput.dataset.index = index;
+    
+    const templateInput = document.createElement("input");
+    templateInput.type = "text";
+    templateInput.className = "transform-template-input";
+    templateInput.value = transform.template || "";
+    templateInput.placeholder = "Template";
+    templateInput.dataset.index = index;
+    
+    content.appendChild(nameInput);
+    content.appendChild(templateInput);
+  } else {
+    const name = document.createElement("span");
+    name.className = "transform-name";
+    name.textContent = transform.name;
+    
+    const template = document.createElement("span");
+    template.className = "transform-template";
+    template.textContent = transform.template;
+    
+    content.appendChild(name);
+    content.appendChild(template);
+  }
+  
+  const actions = document.createElement("div");
+  actions.className = "transform-row__actions";
+  
+  if (isEditable) {
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "btn-danger btn-small";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", () => removeTransformation(index));
+    actions.appendChild(removeBtn);
+  } else {
+    //const editBtn = document.createElement("button");
+    //editBtn.type = "button";
+    //editBtn.className = "btn-secondary btn-small";
+    //editBtn.textContent = "Edit";
+    //editBtn.addEventListener("click", () => editRule());
+    
     const deleteBtn = document.createElement("button");
     deleteBtn.type = "button";
+    deleteBtn.className = "btn-danger btn-small";
     deleteBtn.textContent = "Delete";
-    deleteBtn.addEventListener("click", () => deleteRule(index));
-
-    actions.append(editBtn, deleteBtn);
-
-    card.append(meta, list, actions);
-    rulesList.appendChild(card);
-  });
+    deleteBtn.addEventListener("click", () => {
+      if (confirm("Delete this transformation?")) {
+        deleteTransformation(index);
+      }
+    });
+    
+    //actions.appendChild(editBtn);
+    actions.appendChild(deleteBtn);
+  }
+  
+  row.appendChild(content);
+  row.appendChild(actions);
+  
+  return row;
 }
 
-function populateForm(rule, index) {
-  if (ruleNameInput) {
-    ruleNameInput.value = rule.name && rule.name !== rule.pattern ? rule.name : "";
-  }
-  patternInput.value = rule.pattern;
-  typeSelect.value = rule.type === "regex" ? "regex" : "string";
-  clearTransformations();
-  const list = rule.transformations && rule.transformations.length ? rule.transformations : [{ name: "", template: "" }];
-  list.forEach((transform) => addTransformationRow(transform));
-  ruleIndexField.value = String(index);
-  showFormStatus("Editing rule #" + (index + 1) + ". Save to apply changes.");
-  window.scrollTo({ top: 0, behavior: "smooth" });
+function showEmptyState() {
+  ruleDetails.innerHTML = `
+    <div class="rule-details__empty">
+      <p>Select a rule from the list to view details, or create a new rule.</p>
+    </div>
+  `;
+  currentRuleIndex = -1;
+  renderRulesList(); // Remove active state
 }
 
-async function deleteRule(index) {
-  const rule = paths[index];
-  const label = rule.name || rule.pattern;
-  const confirmed = window.confirm(`Delete rule "${label}"?`);
-  if (!confirmed) {
-    return;
-  }
-  paths.splice(index, 1);
-  try {
-    await persistPaths("Rule deleted.");
-    resetForm();
-  } catch (error) {
-    console.error("Failed to delete rule", error);
-    showFormStatus("Unable to delete rule. Try again.");
-  }
-}
-
-function onTestRule() {
-  testResultsList.innerHTML = "";
-  testStatus.textContent = "";
-
-  const sampleUrl = sampleUrlInput.value.trim();
-  if (!sampleUrl) {
-    testStatus.textContent = "Enter a sample URL to run the test.";
-    return;
-  }
-
-  const rule = {
-    name: ruleNameInput ? ruleNameInput.value.trim() : "",
-    pattern: patternInput.value.trim(),
-    type: typeSelect.value === "regex" ? "regex" : "string",
-    transformations: collectTransformations(),
+function createNewRule() {
+  const newRule = {
+    name: "New Rule",
+    pattern: "",
+    type: "string",
+    transformations: []
   };
-
-  if (!rule.pattern || rule.transformations.length === 0) {
-    testStatus.textContent = "Add a pattern and at least one transformation first.";
-    return;
-  }
-
-  const upgradedRule = upgradeRule(rule);
-  if (!upgradedRule) {
-    testStatus.textContent = "Check the rule details and try again.";
-    return;
-  }
-
-  const results = resolveTransformations(upgradedRule, sampleUrl, { strict: false });
-  if (!results || results.length === 0) {
-    testStatus.textContent = "No match for this sample URL.";
-    return;
-  }
-
-  results.forEach((item) => {
-    const li = document.createElement("li");
-    li.className = "test-results__item";
-    const nameEl = document.createElement("div");
-    const nameStrong = document.createElement("strong");
-    nameStrong.textContent = item.name || item.target;
-    nameEl.appendChild(nameStrong);
-
-    const targetEl = document.createElement("div");
-    targetEl.textContent = `Target: ${item.target}`;
-
-    const templateEl = document.createElement("small");
-    templateEl.textContent = `Template: ${item.template}`;
-
-    li.append(nameEl, targetEl, templateEl);
-    if (!item.validUrl) {
-      const warn = document.createElement("div");
-      warn.className = "form__hint";
-      warn.textContent = "Note: result is not a fully qualified URL.";
-      li.appendChild(warn);
-    }
-    testResultsList.appendChild(li);
-  });
-
-  testStatus.textContent = "Match found.";
+  
+  paths.push(newRule);
+  currentRuleIndex = paths.length - 1;
+  renderRulesList();
+  editRule();
 }
 
-function resolveTransformations(rule, url, options = {}) {
-  const strict = options.strict !== false;
+function editRule() {
+  if (currentRuleIndex < 0 || currentRuleIndex >= paths.length) return;
+  
+  isEditMode = true;
+  const rule = paths[currentRuleIndex];
+  
+  const detailsContainer = document.createElement("div");
+  
+  // Header
+  const header = document.createElement("div");
+  header.className = "rule-details__header";
+  
+  const title = document.createElement("h2");
+  title.className = "rule-details__title";
+  title.textContent = "Edit Rule";
+  
+  const actions = document.createElement("div");
+  actions.className = "rule-details__actions";
+  
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.className = "btn-primary";
+  saveBtn.textContent = "Save";
+  saveBtn.addEventListener("click", saveRule);
+  
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "btn-secondary";
+  cancelBtn.textContent = "Cancel";
+  cancelBtn.addEventListener("click", cancelEdit);
+  
+  actions.appendChild(saveBtn);
+  actions.appendChild(cancelBtn);
+  header.appendChild(title);
+  header.appendChild(actions);
+  
+  // Content
+  const content = document.createElement("div");
+  content.className = "rule-details__content";
+  
+  // Form fields
+  const nameGroup = createFormGroup("Rule Name:", "editRuleName", "text", rule.name || "", true);
+  const patternGroup = createFormGroup("Pattern:", "editPattern", "text", rule.pattern, true);
+  const typeGroup = createSelectGroup("Match Type:", "editType", [
+    { value: "string", label: "String", selected: rule.type === "string" },
+    { value: "regex", label: "Regex", selected: rule.type === "regex" }
+  ]);
+  
+  content.appendChild(nameGroup);
+  content.appendChild(patternGroup);
+  content.appendChild(typeGroup);
+  
+  // Transformations section
+  const transformationsSection = document.createElement("div");
+  transformationsSection.className = "transformations-section";
+  
+  const transformationsHeader = document.createElement("div");
+  transformationsHeader.className = "transformations-header";
+  
+  const transformationsTitle = document.createElement("h3");
+  transformationsTitle.textContent = "Transformations";
+  
+  const addTransformBtn = document.createElement("button");
+  addTransformBtn.type = "button";
+  addTransformBtn.className = "btn-primary btn-small";
+  addTransformBtn.textContent = "Add Transformation";
+  addTransformBtn.addEventListener("click", addTransformation);
+  
+  transformationsHeader.appendChild(transformationsTitle);
+  transformationsHeader.appendChild(addTransformBtn);
+  
+  const transformationsList = document.createElement("div");
+  transformationsList.className = "transformations-list";
+  transformationsList.id = "transformationsList";
+  
+  if (rule.transformations.length === 0) {
+    const emptyState = document.createElement("div");
+    emptyState.className = "empty-state";
+    emptyState.textContent = "No transformations added yet.";
+    transformationsList.appendChild(emptyState);
+  } else {
+    rule.transformations.forEach((transform, index) => {
+      const transformRow = createTransformationRow(transform, index, true);
+      transformationsList.appendChild(transformRow);
+    });
+  }
+  
+  transformationsSection.appendChild(transformationsHeader);
+  transformationsSection.appendChild(transformationsList);
+  content.appendChild(transformationsSection);
+  
+  detailsContainer.appendChild(header);
+  detailsContainer.appendChild(content);
+  
+  ruleDetails.innerHTML = "";
+  ruleDetails.appendChild(detailsContainer);
+}
+
+function createFormGroup(labelText, inputId, inputType, value, required = false) {
+  const group = document.createElement("div");
+  group.className = "form-group";
+  
+  const label = document.createElement("label");
+  label.setAttribute("for", inputId);
+  label.textContent = labelText;
+  
+  const input = document.createElement("input");
+  input.type = inputType;
+  input.id = inputId;
+  input.value = value;
+  if (required) input.required = true;
+  
+  group.appendChild(label);
+  group.appendChild(input);
+  
+  return group;
+}
+
+function createSelectGroup(labelText, selectId, options) {
+  const group = document.createElement("div");
+  group.className = "form-group";
+  
+  const label = document.createElement("label");
+  label.setAttribute("for", selectId);
+  label.textContent = labelText;
+  
+  const select = document.createElement("select");
+  select.id = selectId;
+  
+  options.forEach(option => {
+    const optionEl = document.createElement("option");
+    optionEl.value = option.value;
+    optionEl.textContent = option.label;
+    if (option.selected) optionEl.selected = true;
+    select.appendChild(optionEl);
+  });
+  
+  group.appendChild(label);
+  group.appendChild(select);
+  
+  return group;
+}
+
+function saveRule() {
+  if (currentRuleIndex < 0) return;
+  
+  const nameInput = document.getElementById("editRuleName");
+  const patternInput = document.getElementById("editPattern");
+  const typeSelect = document.getElementById("editType");
+  
+  if (!nameInput || !patternInput || !typeSelect) return;
+  
+  const name = nameInput.value.trim();
+  const pattern = patternInput.value.trim();
+  const type = typeSelect.value;
+  
+  if (!pattern) {
+    alert("Pattern is required");
+    return;
+  }
+  
+  // Collect transformations
+  const transformations = collectEditableTransformations();
+  
+  const rule = { name: name || pattern, pattern, type, transformations };
+  const upgradedRule = upgradeRule(rule);
+  
+  if (!upgradedRule) {
+    alert("Invalid rule data");
+    return;
+  }
+  
+  paths[currentRuleIndex] = upgradedRule;
+  persistPaths();
+  renderRuleDetails(upgradedRule);
+  isEditMode = false;
+}
+
+function cancelEdit() {
+  if (currentRuleIndex >= 0 && currentRuleIndex < paths.length) {
+    renderRuleDetails(paths[currentRuleIndex]);
+  } else {
+    showEmptyState();
+  }
+  isEditMode = false;
+}
+
+function collectEditableTransformations() {
+  const nameInputs = document.querySelectorAll(".transform-name-input");
+  const templateInputs = document.querySelectorAll(".transform-template-input");
+  
+  const transformations = [];
+  for (let i = 0; i < Math.min(nameInputs.length, templateInputs.length); i++) {
+    const name = nameInputs[i].value.trim();
+    const template = templateInputs[i].value.trim();
+    if (template) {
+      transformations.push({ name: name || template, template });
+    }
+  }
+  return transformations;
+}
+
+function addTransformation() {
+  if (!isEditMode || currentRuleIndex < 0) return;
+  
+  const rule = paths[currentRuleIndex];
+  rule.transformations.push({ name: "", template: "" });
+  
+  const transformationsList = document.getElementById("transformationsList");
+  if (transformationsList) {
+    // Clear empty state if present
+    if (transformationsList.querySelector(".empty-state")) {
+      transformationsList.innerHTML = "";
+    }
+    
+    // Add new transformation row
+    const newIndex = rule.transformations.length - 1;
+    const transformRow = createTransformationRow(rule.transformations[newIndex], newIndex, true);
+    transformationsList.appendChild(transformRow);
+  }
+}
+
+function removeTransformation(index) {
+  if (!isEditMode || currentRuleIndex < 0) return;
+  
+  const rule = paths[currentRuleIndex];
+  rule.transformations.splice(index, 1);
+  
+  const transformationsList = document.getElementById("transformationsList");
+  if (transformationsList) {
+    transformationsList.innerHTML = "";
+    
+    if (rule.transformations.length === 0) {
+      const emptyState = document.createElement("div");
+      emptyState.className = "empty-state";
+      emptyState.textContent = "No transformations added yet.";
+      transformationsList.appendChild(emptyState);
+    } else {
+      rule.transformations.forEach((transform, idx) => {
+        const transformRow = createTransformationRow(transform, idx, true);
+        transformationsList.appendChild(transformRow);
+      });
+    }
+  }
+}
+
+function deleteTransformation(index) {
+  if (currentRuleIndex < 0 || currentRuleIndex >= paths.length) return;
+  
+  const rule = paths[currentRuleIndex];
+  rule.transformations.splice(index, 1);
+  
+  persistPaths();
+  renderRuleDetails(rule);
+}
+
+function deleteCurrentRule() {
+  if (currentRuleIndex < 0 || currentRuleIndex >= paths.length) return;
+  
+  const rule = paths[currentRuleIndex];
+  const confirmed = confirm(`Delete rule "${rule.name || rule.pattern}"?`);
+  
+  if (confirmed) {
+    paths.splice(currentRuleIndex, 1);
+    persistPaths();
+    showEmptyState();
+  }
+}
+
+async function onSaveRule(event) {
+  event.preventDefault();
+  // This function exists for form submission compatibility but isn't used in the new UI
+}
+
+function onTestInputChange() {
+  const url = testInput.value.trim();
+  if (!url) {
+    testOutput.textContent = "Enter a URL above to see the result";
+    return;
+  }
+  
+  // For now, just mirror the input as requested
+  testOutput.textContent = url;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function upgradeRule(rule) {
   if (!rule || typeof rule.pattern !== "string") {
     return null;
   }
 
+  const pattern = rule.pattern.trim();
+  if (!pattern) {
+    return null;
+  }
+
+  const name = typeof rule.name === "string" && rule.name.trim().length > 0 ? rule.name.trim() : pattern;
+  const type = rule.type === "regex" ? "regex" : "string";
   const transformations = Array.isArray(rule.transformations)
     ? rule.transformations.map(toTransformation).filter(Boolean)
     : [];
 
-  if (!transformations.length) {
-    return null;
-  }
-
-  if (rule.type === "regex") {
-    let regex;
-    try {
-      regex = new RegExp(rule.pattern);
-    } catch (error) {
-      console.warn("Invalid regex pattern", rule.pattern, error);
-      return null;
-    }
-
-    const match = url.match(regex);
-    if (!match) {
-      return null;
-    }
-
-    return transformations
-      .map(({ name, template }) => {
-        const target = template.replace(/\\(\d+)/g, (full, group) => {
-          const groupIndex = Number(group);
-          return match[groupIndex] ?? "";
-        });
-        const validUrl = isLikelyUrl(target);
-        return {
-          name: name || target,
-          template,
-          target,
-          validUrl,
-        };
-      })
-      .filter((item) => item.target && (!strict || item.validUrl));
-  }
-
-  if (!url.includes(rule.pattern)) {
-    return null;
-  }
-
-  return transformations
-    .map(({ name, template }) => {
-      const target = template
-        .replace(/\{\{\s*url\s*\}\}/gi, url)
-        .replace(/\{\{\s*pattern\s*\}\}/gi, rule.pattern);
-      const validUrl = isLikelyUrl(target);
-      return {
-        name: name || target,
-        template,
-        target,
-        validUrl,
-      };
-    })
-    .filter((item) => item.target && (!strict || item.validUrl));
-}
-
-function isLikelyUrl(value) {
-  try {
-    new URL(value);
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
-
-function addTransformationRow(data = {}) {
-  if (!transformRowTemplate || !transformationsList) {
-    return;
-  }
-
-  const fragment = transformRowTemplate.content.cloneNode(true);
-  const row = fragment.querySelector(".transform-row");
-  const nameInput = row.querySelector("[data-transform-name]");
-  const templateInput = row.querySelector("[data-transform-template]");
-  const removeBtn = row.querySelector("[data-remove-transform]");
-
-  nameInput.value = data.name ?? "";
-  templateInput.value = data.template ?? "";
-
-  removeBtn.addEventListener("click", () => {
-    row.remove();
-    ensureTransformRowPresence();
-  });
-
-  transformationsList.appendChild(row);
-
-  if (!(data.name || data.template)) {
-    const focusField = () => nameInput.focus();
-    if (typeof queueMicrotask === "function") {
-      queueMicrotask(focusField);
-    } else {
-      setTimeout(focusField, 0);
-    }
-  }
-}
-
-function clearTransformations() {
-  if (!transformationsList) {
-    return;
-  }
-  transformationsList.innerHTML = "";
-}
-
-function ensureTransformRowPresence() {
-  if (!transformationsList) {
-    return;
-  }
-  if (!transformationsList.querySelector(".transform-row")) {
-    addTransformationRow();
-  }
-}
-
-function collectTransformations() {
-  if (!transformationsList) {
-    return [];
-  }
-  const rows = Array.from(transformationsList.querySelectorAll(".transform-row"));
-  return rows
-    .map((row) => {
-      const nameInput = row.querySelector("[data-transform-name]");
-      const templateInput = row.querySelector("[data-transform-template]");
-      return toTransformation({
-        name: nameInput.value,
-        template: templateInput.value,
-      });
-    })
-    .filter(Boolean);
+  return { name, pattern, type, transformations };
 }
 
 function toTransformation(input) {
@@ -435,94 +632,6 @@ function toTransformation(input) {
 
   const name = typeof input.name === "string" && input.name.trim().length > 0 ? input.name.trim() : template;
   return { name, template };
-}
-
-function upgradeRule(rule) {
-  if (!rule || typeof rule.pattern !== "string") {
-    return null;
-  }
-
-  const pattern = rule.pattern.trim();
-  if (!pattern) {
-    return null;
-  }
-
-  const name = typeof rule.name === "string" && rule.name.trim().length > 0 ? rule.name.trim() : pattern;
-  const type = rule.type === "regex" ? "regex" : "string";
-  const transformations = Array.isArray(rule.transformations)
-    ? rule.transformations.map(toTransformation).filter(Boolean)
-    : [];
-
-  if (!transformations.length) {
-    return null;
-  }
-
-  return { name, pattern, type, transformations };
-}
-
-function onExport() {
-  const payload = JSON.stringify(paths, null, 2);
-  const blob = new Blob([payload], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  const timestamp = new Date().toISOString().split("T")[0];
-  link.download = `url-paths-${timestamp}.json`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-}
-
-async function onImport(event) {
-  const file = event.target.files && event.target.files[0];
-  if (!file) {
-    return;
-  }
-
-  try {
-    const text = await file.text();
-    const parsed = JSON.parse(text);
-    const incoming = normaliseImportedData(parsed);
-    if (!incoming.length) {
-      showFormStatus("No valid rules found in import file.");
-      return;
-    }
-
-    if (importMode.value === "replace") {
-      paths = incoming;
-    } else {
-      paths = paths.concat(incoming);
-    }
-
-    await persistPaths("Rules imported.");
-    resetForm();
-  } catch (error) {
-    console.error("Import failed", error);
-    showFormStatus("Failed to import rules. Check the file format.");
-  } finally {
-    importFile.value = "";
-  }
-}
-
-function normaliseImportedData(data) {
-  if (Array.isArray(data)) {
-    return data.map(upgradeRule).filter(Boolean);
-  }
-  if (data && Array.isArray(data.paths)) {
-    return data.paths.map(upgradeRule).filter(Boolean);
-  }
-  return [];
-}
-
-function showFormStatus(message) {
-  formStatus.textContent = message;
-  if (statusTimer) {
-    clearTimeout(statusTimer);
-  }
-  statusTimer = setTimeout(() => {
-    formStatus.textContent = "";
-  }, 3000);
 }
 
 function storageGet(keys) {
@@ -550,3 +659,11 @@ function storageSet(items) {
     });
   });
 }
+
+// Make functions global for onclick handlers
+window.editRule = editRule;
+window.deleteCurrentRule = deleteCurrentRule;
+window.saveRule = saveRule;
+window.cancelEdit = cancelEdit;
+window.addTransformation = addTransformation;
+window.removeTransformation = removeTransformation;

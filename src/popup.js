@@ -102,7 +102,7 @@ function resolveTransformations(rule, url) {
 
     return transformations
       .map(({ name, template }) => {
-        const target = template.replace(/\\(\d+)/g, (full, group) => {
+        const target = template.replace(/{{(\d+)}}/g, (full, group) => {
           const groupIndex = Number(group);
           return match[groupIndex] ?? "";
         });
@@ -141,12 +141,10 @@ function renderMatch(match) {
   const { rule, transformations } = match;
   const fragment = matchTemplate.content.cloneNode(true);
   const title = fragment.querySelector(".match__title");
-  const source = fragment.querySelector(".match__source");
   const list = fragment.querySelector(".match__list");
 
   title.textContent = rule.name || rule.pattern;
   const ruleKind = rule.type === "regex" ? "Regex" : "String";
-  source.textContent = `${ruleKind} rule · ${rule.pattern}`;
 
   transformations.forEach((item) => {
     const transformNode = transformTemplate.content.cloneNode(true);
