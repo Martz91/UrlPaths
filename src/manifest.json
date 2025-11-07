@@ -8,5 +8,9 @@
     "default_popup": "popup.html",
     "default_title": "URL Paths"
   },
-  "options_page": "options.html"
+  "options_page": "options.html",
+  "web_accessible_resources": [{
+    "resources": ["utils.js"],
+    "matches": ["<all_urls>"]
+  }]
 }
