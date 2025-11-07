@@ -15,6 +15,14 @@ class RulesManager {
     this.elements.addNewRuleBtn?.addEventListener("click", () => this.createNewRule());
     this.elements.testInput?.addEventListener("input", () => this.onTestInputChange());
     this.elements.ruleForm?.addEventListener("submit", (e) => this.onSaveRule(e));
+    this.elements.exportBtn?.addEventListener("click", () => this.exportRules());
+    this.elements.importBtn?.addEventListener("click", () => this.importRules());
+
+    // Import dialog listeners
+    this.elements.importFileInput?.addEventListener("change", (e) => this.onImportFileSelected(e));
+    this.elements.importDialogConfirm?.addEventListener("click", () => this.confirmImport());
+    this.elements.importDialogCancel?.addEventListener("click", () => this.cancelImport());
+
   }
 
   async loadRules() {
@@ -177,9 +185,22 @@ class RulesManager {
       patternInput: document.getElementById("pattern"),
       typeSelect: document.getElementById("type"),
       transformRowTemplate: document.getElementById("transformRowTemplate"),
+      exportBtn: document.getElementById("exportRules"),
+      importBtn: document.getElementById("importRules"),
       importFile: document.getElementById("importFile"),
-      importMode: document.getElementById("importMode")
+
+      // Dialog elements
+      importDialog: document.getElementById("importDialog"),
+      importFileInput: document.getElementById("importFileInput"),
+      importModeSelect: document.getElementById("importModeSelect"),
+      importFileDetails: document.getElementById("importFileDetails"),
+      importFileName: document.getElementById("importFileName"),
+      importRuleCount: document.getElementById("importRuleCount"),
+      importDialogConfirm: document.getElementById("importDialogConfirm"),
+      importDialogCancel: document.getElementById("importDialogCancel")
     }
+
+
 
     // Set up event listeners
     this.setupEventListeners();
@@ -480,9 +501,6 @@ class RulesManager {
     this.isEditMode = false;
   }
 
-
-
-
   cancelEdit() {
     if (this.currentRuleIndex >= 0 && this.currentRuleIndex < this.rules.length) {
       this.renderRuleDetails(this.rules[this.currentRuleIndex]);
@@ -588,7 +606,177 @@ class RulesManager {
     this.elements.testOutput.textContent = url;
   }
 
+  exportRules() {
+    try {
+      const exportData = {
+        version: "1.0.0",
+        exportDate: new Date().toISOString(),
+        rules: this.rules
+      };
 
+      const dataStr = JSON.stringify(exportData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(dataBlob);
+      link.download = `urlpaths-rules-${new Date().toISOString().split('T')[0]}.json`;
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Cleanup
+      URL.revokeObjectURL(link.href);
+
+      alert(`Successfully exported ${this.rules.length} rules.`);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export rules. Please try again.');
+    }
+  }
+
+  importRules() {
+    // Just show the dialog - no need to trigger file input
+    this.showImportDialog();
+  }
+
+  showImportDialog() {
+    // Reset dialog state
+    this.elements.importFileInput.value = '';
+    this.elements.importModeSelect.value = 'merge';
+    this.elements.importFileDetails.style.display = 'none';
+    this.elements.importDialogConfirm.disabled = true;
+
+    this.elements.importDialog.showModal();
+  }
+
+
+  async onImportFileSelected(event) {
+    const file = event.target.files[0];
+    if (!file) {
+      this.elements.importFileDetails.style.display = 'none';
+      this.elements.importDialogConfirm.disabled = true;
+      return;
+    }
+
+    try {
+      const text = await this.readFileAsText(file);
+      const importData = JSON.parse(text);
+
+      if (!this.validateImportData(importData)) {
+        alert('Invalid file format. Please select a valid UrlPaths export file.');
+        this.elements.importFileInput.value = '';
+        return;
+      }
+
+      const validRules = (importData.rules || [])
+        .map(rule => this.upgradeRule(rule))
+        .filter(Boolean);
+
+      // Update UI with file details
+      this.elements.importFileName.textContent = file.name;
+      this.elements.importRuleCount.textContent = validRules.length;
+      this.elements.importFileDetails.style.display = 'block';
+      this.elements.importDialogConfirm.disabled = validRules.length === 0;
+
+      if (validRules.length === 0) {
+        alert('No valid rules found in the selected file.');
+      }
+
+    } catch (error) {
+      console.error('File validation failed:', error);
+      if (error instanceof SyntaxError) {
+        alert('Invalid JSON file. Please select a valid UrlPaths export file.');
+      } else {
+        alert('Failed to read the file. Please try again.');
+      }
+      this.elements.importFileInput.value = '';
+      this.elements.importFileDetails.style.display = 'none';
+      this.elements.importDialogConfirm.disabled = true;
+    }
+  }
+
+  async confirmImport() {
+    const file = this.elements.importFileInput.files[0];
+    if (!file) return;
+
+    try {
+      const text = await this.readFileAsText(file);
+      const importData = JSON.parse(text);
+      const importMode = this.elements.importModeSelect.value;
+      const importedRules = importData.rules || [];
+
+      const validRules = importedRules
+        .map(rule => this.upgradeRule(rule))
+        .filter(Boolean);
+
+      if (importMode === "replace") {
+        this.rules = validRules;
+      } else {
+        // Merge rules - avoid duplicates
+        const existingKeys = new Set(this.rules.map(r => `${r.pattern}:${r.type}`));
+        const newRules = validRules.filter(rule =>
+          !existingKeys.has(`${rule.pattern}:${rule.type}`)
+        );
+        this.rules = [...this.rules, ...newRules];
+      }
+
+      await this.persistRules();
+      this.renderRulesList();
+
+      if (this.rules.length > 0 && this.currentRuleIndex < 0) {
+        this.selectRule(0);
+      }
+
+      const message = importMode === "replace"
+        ? `Successfully replaced all rules with ${validRules.length} imported rules.`
+        : `Successfully imported ${validRules.length} rules (${this.rules.length} total rules).`;
+
+      this.elements.importDialog.close();
+      alert(message);
+
+    } catch (error) {
+      console.error('Import failed:', error);
+      alert('Failed to import rules. Please try again.');
+    }
+  }
+
+  cancelImport() {
+    this.elements.importDialog.close();
+  }
+
+  readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(file);
+    });
+  }
+
+  validateImportData(data) {
+    if (!data || typeof data !== 'object') return false;
+    if (!Array.isArray(data.rules)) return false;
+
+    // Basic validation - each rule should have pattern property
+    return data.rules.every(rule =>
+      rule && typeof rule === 'object' && typeof rule.pattern === 'string'
+    );
+  }
+
+  // Wrap storage methods in the class
+  storageGet(keys) {
+    return storageGet(keys);
+  }
+
+  storageSet(items) {
+    return storageSet(items);
+  }
+
+  upgradeRule(rule) {
+    return upgradeRule(rule);
+  }
 
   async persistRules() {
     this.rules = this.rules.map(rule => this.upgradeRule(rule)).filter(Boolean);

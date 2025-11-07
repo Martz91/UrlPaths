@@ -1,17 +1,23 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>URL Paths Settings</title>
   <link rel="stylesheet" href="options.css">
 </head>
+
 <body>
   <header class="app-header">
-    <h1 class="app-header__title">UrlPaths Options</h1>
-    <span class="app-header__version">v1.0.0</span>
+    <h1 class="app-header__title">UrlPaths Rules Manager</h1>
+  <div class="app-header__actions">
+    <button type="button" id="exportRules" class="btn-secondary btn-small">Export</button>
+    <button type="button" id="importRules" class="btn-secondary btn-small">Import</button>
+    <span class="app-header__version">v1.0</span>
+  </div>
   </header>
-  
+
   <main class="app-layout">
     <aside class="rules-panel">
       <div class="rules-panel__header">
@@ -20,7 +26,7 @@
       </div>
       <div id="rulesList" class="rules-list"></div>
     </aside>
-    
+
     <section class="details-panel">
       <div id="ruleDetails" class="rule-details">
         <div class="rule-details__empty">
@@ -29,7 +35,7 @@
       </div>
     </section>
   </main>
-  
+
   <footer class="test-section">
     <h3>Test Rule</h3>
     <div class="test-form">
@@ -80,12 +86,38 @@
 
   <!-- Import/Export (hidden file input) -->
   <input id="importFile" type="file" accept="application/json,.json" style="display: none;">
-  <select id="importMode" style="display: none;">
-    <option value="merge">Merge with existing</option>
-    <option value="replace">Replace existing</option>
-  </select>
+
+  <dialog id="importDialog" class="import-dialog">
+  <div class="dialog-content">
+    <h3>Import Rules</h3>
+    
+    <div class="form-group">
+      <label for="importFileInput">Select rules file:</label>
+      <input type="file" id="importFileInput" accept=".json" class="file-input">
+    </div>
+    
+    <div class="form-group">
+      <label for="importModeSelect">Import mode:</label>
+      <select id="importModeSelect" class="select-input">
+        <option value="merge">Merge with existing rules</option>
+        <option value="replace">Replace all existing rules</option>
+      </select>
+    </div>
+    
+    <div id="importFileDetails" class="file-details" style="display: none;">
+      <p>Selected file: <span id="importFileName"></span></p>
+      <p>Rules found: <span id="importRuleCount">-</span></p>
+    </div>
+    
+    <div class="dialog-actions">
+      <button type="button" id="importDialogConfirm" class="btn-primary" disabled>Import</button>
+      <button type="button" id="importDialogCancel" class="btn-secondary">Cancel</button>
+    </div>
+  </div>
+</dialog>
 
   <script src="utils.js"></script>
   <script src="options.js"></script>
 </body>
+
 </html>
