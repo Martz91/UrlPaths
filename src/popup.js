@@ -68,72 +68,6 @@ function collectMatches(paths, url) {
 }
 
 /**
- * Resolves transformations for a rule against a URL and returns valid targets.
- * @param {Object} rule - The rule definition.
- * @param {string} url - The URL to test against the rule pattern.
- * @returns {Array<Object>|null} Transformation targets or null when none match.
- */
-function resolveTransformations(rule, url) {
-  if (!rule || typeof rule.pattern !== "string") {
-    return null;
-  }
-
-  const transformations = Array.isArray(rule.transformations)
-    ? rule.transformations.map(toTransformation).filter(Boolean)
-    : [];
-
-  if (!transformations.length) {
-    return null;
-  }
-
-  if (rule.type === "regex") {
-    let regex;
-    try {
-      regex = new RegExp(rule.pattern);
-    } catch (error) {
-      console.warn("Invalid regex pattern", rule.pattern, error);
-      return null;
-    }
-
-    const match = url.match(regex);
-    if (!match) {
-      return null;
-    }
-
-    return transformations
-      .map(({ name, template }) => {
-        const target = template.replace(/{{(\d+)}}/g, (full, group) => {
-          const groupIndex = Number(group);
-          return match[groupIndex] ?? "";
-        });
-        return {
-          name: name || target,
-          template,
-          target,
-        };
-      })
-      .filter((item) => item.target && isLikelyUrl(item.target));
-  }
-
-  if (!url.includes(rule.pattern)) {
-    return null;
-  }
-
-  return transformations
-    .map(({ name, template }) => {
-      const target = template
-        .replace(/\{\{\s*url\s*\}\}/gi, url)
-        .replace(/\{\{\s*pattern\s*\}\}/gi, rule.pattern);
-      return {
-        name: name || target,
-        template,
-        target,
-      };
-    })
-    .filter((item) => item.target && isLikelyUrl(item.target));
-}
-
-/**
  * Renders a matched rule and its transformations into the popup UI.
  * @param {Object} match - The rule match data containing the rule and transformations.
  */
@@ -198,18 +132,4 @@ function openUrl(targetUrl, openInNewTab, makeActive = true) {
 
   chrome.tabs.update(currentTab.id, { url: targetUrl });
   window.close();
-}
-
-/**
- * Determines if a value can be parsed as a valid URL.
- * @param {string} value - The string to validate.
- * @returns {boolean} True when the value is a valid URL.
- */
-function isLikelyUrl(value) {
-  try {
-    new URL(value);
-    return true;
-  } catch (error) {
-    return false;
-  }
 }

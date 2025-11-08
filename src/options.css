@@ -275,6 +275,18 @@ body {
   background: var(--panel-bg);
   border-top: 1px solid var(--border);
   padding: 20px 24px;
+  min-height: 300px; /* Keep for main test section */
+}
+
+/* Override for result sections */
+.test-sections .test-section {
+  min-height: auto; /* Let content determine height */
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-bg);
+  border-top: none; /* Remove since this overrides the main test-section */
 }
 
 .test-section h3 {
@@ -285,25 +297,26 @@ body {
 
 .test-form {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto 1fr;
   gap: 16px;
-  max-width: 800px;
+  height: 100%;
 }
 
 @media (max-width: 768px) {
   .test-form {
-    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
   }
 }
 
-.test-form__group {
+.test-form__input-row {
   display: grid;
   gap: 6px;
 }
 
-.test-form__group label {
-  font-weight: 500;
-  font-size: 0.875rem;
+.test-form__results {
+  display: grid;
+  gap: 6px;
+  min-height: 200px;
 }
 
 .test-output {
@@ -311,10 +324,12 @@ body {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
-  min-height: 40px;
-  font-family: ui-monospace, monospace;
+  min-height: 200px;
+  font-family: inherit;
   font-size: 0.875rem;
-  color: var(--muted);
+  color: var(--fg);
+  overflow-y: auto;
+  height: 100%;
 }
 
 /* Form Elements */
@@ -469,4 +484,192 @@ button {
 .dialog-actions button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Test Results Styles */
+.test-result {
+  font-family: inherit;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.test-status {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.test-match {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.test-no-match {
+  background: rgba(148, 163, 184, 0.1);
+  color: var(--muted);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.test-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.test-sections {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+@media (max-width: 768px) {
+  .test-sections {
+    grid-template-columns: 1fr;
+  }
+}
+
+.test-section {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-bg);
+}
+
+.test-section:last-child {
+  margin-bottom: 0;
+}
+
+.test-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.test-section h5 {
+  margin: 0 0 6px 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.highlighted-output {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: ui-monospace, monospace;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.highlight {
+  background: #fff3cd;
+  color: #856404;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-weight: 600;
+  border: 1px solid #ffeaa7;
+}
+
+.groups-display {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.group-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+}
+
+.group-item {
+  padding: 6px 8px;
+  margin: 4px 0;
+  background: rgba(59, 130, 246, 0.05);
+  border-radius: 4px;
+  border-left: 3px solid var(--accent);
+  font-family: ui-monospace, monospace;
+  font-size: 0.875rem;
+}
+
+.group-number {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.group-value {
+  background: rgba(241, 245, 249, 0.8);
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: 8px;
+  color: var(--fg);
+}
+
+.no-groups {
+  color: var(--muted);
+  font-style: italic;
+  margin: 8px 0;
+}
+
+.transformation-results {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.transform-result {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.transform-result:last-child {
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
+.transform-template {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.transform-template code {
+  background: rgba(241, 245, 249, 0.8);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: ui-monospace, monospace;
+}
+
+.transform-outputs {
+  margin-top: 6px;
+}
+
+.transform-output {
+  padding: 4px 8px;
+  margin: 2px 0;
+  background: rgba(16, 185, 129, 0.05);
+  border-radius: 4px;
+  border-left: 3px solid var(--success);
+  font-family: ui-monospace, monospace;
+  font-size: 0.875rem;
+}
+
+.match-label {
+  font-weight: 500;
+  color: var(--muted);
+  font-family: inherit;
+}
+
+.result-url {
+  color: var(--fg);
+  word-break: break-all;
 }

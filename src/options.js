@@ -1,4 +1,3 @@
-
 class RulesManager {
   constructor() {
     this.rules = [];
@@ -598,12 +597,304 @@ class RulesManager {
   onTestInputChange() {
     const url = this.elements.testInput.value.trim();
     if (!url) {
-      this.elements.testOutput.textContent = "Enter a URL above to see the result";
+      this.elements.testOutput.innerHTML = "Enter a URL above to see the result";
       return;
     }
 
-    // For now, just mirror the input as requested
-    this.elements.testOutput.textContent = url;
+    if (this.currentRuleIndex < 0 || this.currentRuleIndex >= this.rules.length) {
+      this.elements.testOutput.innerHTML = "Select a rule to test";
+      return;
+    }
+
+    const rule = this.rules[this.currentRuleIndex];
+    this.testRule(rule, url);
+  }
+
+  testRule(rule, testString) {
+    try {
+      let matches = [];
+      let regexMatches = [];
+
+      if (rule.type === "regex") {
+        try {
+          const regex = new RegExp(rule.pattern, 'g');
+          let match;
+          let matchCount = 0;
+
+          while ((match = regex.exec(testString)) !== null && matchCount < 100) {
+            matchCount++;
+            
+            const matchData = {
+              fullMatch: match[0],
+              groups: [],
+              index: match.index
+            };
+
+            // Process capturing groups
+            for (let i = 1; i < match.length; i++) {
+              if (match[i] !== undefined) {
+                matchData.groups.push({
+                  number: i,
+                  value: match[i]
+                });
+              }
+            }
+
+            regexMatches.push(matchData);
+
+            // Prevent infinite loops for zero-width matches
+            if (match[0].length === 0) {
+              regex.lastIndex++;
+            }
+          }
+
+          matches = regexMatches;
+        } catch (error) {
+          this.displayTestError(`Invalid regex pattern: ${error.message}`);
+          return;
+        }
+      } else {
+        // String matching
+        if (testString.includes(rule.pattern)) {
+          matches = [{
+            fullMatch: rule.pattern,
+            groups: [],
+            index: testString.indexOf(rule.pattern)
+          }];
+        }
+      }
+
+      this.displayTestResult(rule, testString, matches);
+
+    } catch (error) {
+      console.error('Test failed:', error);
+      this.displayTestError(`Test failed: ${error.message}`);
+    }
+  }
+
+  displayTestResult(rule, testString, matches) {
+    let html = '<div class="test-result">';
+
+    if (matches.length === 0) {
+      html += '<div class="test-status test-no-match">No match found</div>';
+    } else {
+      html += `<div class="test-status test-match">✓ Rule matched (${matches.length} match${matches.length > 1 ? 'es' : ''})</div>`;
+
+      // Create sections container for horizontal layout
+      html += '<div class="test-sections">';
+      
+      // Left section: Highlighted text and capturing groups
+      html += '<div class="test-section-group">';
+      
+      // Show highlighted text
+      if (rule.type === "regex") {
+        const highlightedText = this.createHighlightedText(rule.pattern, testString);
+        html += '<div class="test-section">';
+        html += '<h4>Highlighted Match:</h4>';
+        html += `<div class="highlighted-output">${highlightedText}</div>`;
+        html += '</div>';
+      }
+
+      // Show capturing groups for regex
+      if (rule.type === "regex" && matches.some(m => m.groups.length > 0)) {
+        html += '<div class="test-section">';
+        html += '<h4>Capturing Groups:</h4>';
+        html += this.createGroupsDisplay(matches);
+        html += '</div>';
+      }
+      
+      html += '</div>'; // End left section
+      
+      // Right section: Transformation results
+      if (rule.transformations.length > 0) {
+        html += '<div class="test-section-group">';
+        const transformationResults = resolveTransformations(rule, testString);
+        html += '<div class="test-section">';
+        html += '<h4>Transformation Results:</h4>';
+        html += this.createTransformationResultsDisplay(transformationResults);
+        html += '</div>';
+        html += '</div>'; // End right section
+      }
+      
+      html += '</div>'; // End sections container
+    }
+
+    html += '</div>';
+    this.elements.testOutput.innerHTML = html;
+  }
+
+  displayTestError(message) {
+    this.elements.testOutput.innerHTML = `
+      <div class="test-result">
+        <div class="test-status test-error">⚠ ${this.sanitizeHtml(message)}</div>
+      </div>
+    `;
+  }
+
+  createHighlightedText(pattern, testString) {
+    try {
+      const elementsToHighlight = this.getElementsToHighlight(pattern, testString);
+      return elementsToHighlight.map(({type, value}) =>
+        type === "group" ? `<span class="highlight">${this.sanitizeHtml(value)}</span>` : this.sanitizeHtml(value)
+      ).join('');
+    } catch (error) {
+      return this.sanitizeHtml(testString);
+    }
+  }
+
+  getElementsToHighlight(pattern, str) {
+    const regex = new RegExp(pattern, 'g');
+    let match;
+    let matchCount = 0;
+    let cursor = 0;
+    let spans = [];
+
+    while ((match = regex.exec(str)) != null && matchCount < 100) {
+      matchCount++;
+      
+      // Add text before match
+      if (cursor < match.index) {
+        spans.push({
+          type: "text",
+          value: str.slice(cursor, match.index)
+        });
+      }
+
+      // Process each capturing group
+      for (let i = 1; i < match.length; i++) {
+        if (match[i] !== undefined) {
+          const groupStart = match.index + match[0].indexOf(match[i]);
+          const groupEnd = groupStart + match[i].length;
+
+          // Add text before group (if any)
+          if (cursor < groupStart) {
+            spans.push({
+              type: "text",
+              value: str.slice(cursor, groupStart)
+            });
+          }
+
+          // Add the group
+          spans.push({
+            type: "group",
+            group: i,
+            value: str.slice(groupStart, groupEnd)
+          });
+          cursor = groupEnd;
+        }
+      }
+
+      // Prevent infinite loop for zero-width matches
+      if (match[0].length === 0) {
+        regex.lastIndex++;
+      }
+    }
+
+    // Add remaining text
+    if (cursor < str.length) {
+      spans.push({
+        type: "text",
+        value: str.slice(cursor)
+      });
+    }
+
+    return spans;
+  }
+
+  createGroupsDisplay(matches) {
+    let html = '<div class="groups-display">';
+
+    matches.forEach((match, matchIndex) => {
+      if (matches.length > 1) {
+        html += `<h5>Match ${matchIndex + 1}:</h5>`;
+      }
+
+      if (match.groups.length > 0) {
+        html += '<ul class="group-list">';
+        match.groups.forEach(group => {
+          html += `
+            <li class="group-item">
+              <span class="group-number">$${group.number}:</span>
+              <span class="group-value">${this.sanitizeHtml(group.value)}</span>
+            </li>
+          `;
+        });
+        html += '</ul>';
+      } else {
+        html += '<p class="no-groups">No capturing groups</p>';
+      }
+    });
+
+    html += '</div>';
+    return html;
+  }
+
+  generateTransformationResultsDELETE(rule, matches) {
+    const transformationResults = [];
+
+    rule.transformations.forEach(transform => {
+      const results = [];
+
+      matches.forEach((match, matchIndex) => {
+        let result = transform.template;
+
+        // Replace $0 with full match
+        result = result.replace(/\$0/g, match.fullMatch);
+
+        // Replace $1, $2, etc. with capturing groups
+        match.groups.forEach(group => {
+          const placeholder = new RegExp(`\\$${group.number}`, 'g');
+          result = result.replace(placeholder, group.value);
+        });
+
+        results.push({
+          matchIndex,
+          result,
+          template: transform.template
+        });
+      });
+
+      transformationResults.push({
+        name: transform.name,
+        template: transform.template,
+        results
+      });
+    });
+
+    return transformationResults;
+  }
+
+  createTransformationResultsDisplay(transformationResults) {
+    let html = '<div class="transformation-results">';
+
+    transformationResults.forEach(transform => {
+      html += '<div class="transform-result">';
+      html += `<h5>${this.sanitizeHtml(transform.name)}</h5>`;
+      html += `<div class="transform-template">Template: <code>${this.sanitizeHtml(transform.template)}</code></div>`;
+      
+      if (transform.target.length > 0) {
+        html += '<div class="transform-outputs">';
+        html += `<div class="transform-output">`;
+        html += `<span class="result-url">${this.sanitizeHtml(transform.target)}</span>`;
+        html += `</div>`;
+        html += '</div>';
+      }
+      
+      html += '</div>';
+    });
+
+    html += '</div>';
+    return html;
+  }
+
+  sanitizeHtml(text) {
+    if (typeof text !== 'string') return '';
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   exportRules() {
