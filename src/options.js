@@ -25,9 +25,9 @@ class RulesManager {
   }
 
   async loadRules() {
-    const stored = await this.storageGet({ rules: [] });
+    const stored = await storageGet({ rules: [] });
     this.rules = Array.isArray(stored.rules)
-      ? stored.rules.map(rule => this.upgradeRule(rule)).filter(Boolean)
+      ? stored.rules.map(rule => upgradeRule(rule)).filter(Boolean)
       : [];
   }
 
@@ -470,18 +470,34 @@ class RulesManager {
     const type = "regex"; // All rules are now regex-based
 
     if (!pattern) {
-      alert("Pattern is required");
+      this.showStatusMessage("Pattern is required", "error");
+      return;
+    }
+
+    // Validate regex pattern
+    try {
+      new RegExp(pattern);
+    } catch (error) {
+      this.showStatusMessage(`Invalid regex pattern: ${error.message}`, "error");
       return;
     }
 
     // Collect transformations
     const transformations = this.collectEditableTransformations();
 
+    // Validate transformations contain proper template syntax
+    for (const transform of transformations) {
+      if (!transform.template.includes('{{') || !transform.template.includes('}}')) {
+        this.showStatusMessage(`Transformation "${transform.name}" should contain template variables like {{1}}, {{2}}, etc.`, "error");
+        return;
+      }
+    }
+
     const rule = { name: name || pattern, pattern, type, transformations };
-    const upgradedRule = this.upgradeRule(rule);
+    const upgradedRule = upgradeRule(rule);
 
     if (!upgradedRule) {
-      alert("Invalid rule data");
+      this.showStatusMessage("Invalid rule data", "error");
       return;
     }
 
@@ -807,41 +823,6 @@ class RulesManager {
     return html;
   }
 
-  generateTransformationResultsDELETE(rule, matches) {
-    const transformationResults = [];
-
-    rule.transformations.forEach(transform => {
-      const results = [];
-
-      matches.forEach((match, matchIndex) => {
-        let result = transform.template;
-
-        // Replace $0 with full match
-        result = result.replace(/\$0/g, match.fullMatch);
-
-        // Replace $1, $2, etc. with capturing groups
-        match.groups.forEach(group => {
-          const placeholder = new RegExp(`\\$${group.number}`, 'g');
-          result = result.replace(placeholder, group.value);
-        });
-
-        results.push({
-          matchIndex,
-          result,
-          template: transform.template
-        });
-      });
-
-      transformationResults.push({
-        name: transform.name,
-        template: transform.template,
-        results
-      });
-    });
-
-    return transformationResults;
-  }
-
   createTransformationResultsDisplay(transformationResults) {
     let html = '<div class="transformation-results">';
 
@@ -898,10 +879,10 @@ class RulesManager {
       // Cleanup
       URL.revokeObjectURL(link.href);
 
-      alert(`Successfully exported ${this.rules.length} rules.`);
+      this.showStatusMessage(`Successfully exported ${this.rules.length} rules.`, "success");
     } catch (error) {
       console.error('Export failed:', error);
-      alert('Failed to export rules. Please try again.');
+      this.showStatusMessage('Failed to export rules. Please try again.', "error");
     }
   }
 
@@ -934,13 +915,13 @@ class RulesManager {
       const importData = JSON.parse(text);
 
       if (!this.validateImportData(importData)) {
-        alert('Invalid file format. Please select a valid UrlPaths export file.');
+        this.showStatusMessage('Invalid file format. Please select a valid UrlPaths export file.', "error");
         this.elements.importFileInput.value = '';
         return;
       }
 
       const validRules = (importData.rules || [])
-        .map(rule => this.upgradeRule(rule))
+        .map(rule => upgradeRule(rule))
         .filter(Boolean);
 
       // Update UI with file details
@@ -950,15 +931,15 @@ class RulesManager {
       this.elements.importDialogConfirm.disabled = validRules.length === 0;
 
       if (validRules.length === 0) {
-        alert('No valid rules found in the selected file.');
+        this.showStatusMessage('No valid rules found in the selected file.', "error");
       }
 
     } catch (error) {
       console.error('File validation failed:', error);
       if (error instanceof SyntaxError) {
-        alert('Invalid JSON file. Please select a valid UrlPaths export file.');
+        this.showStatusMessage('Invalid JSON file. Please select a valid UrlPaths export file.', "error");
       } else {
-        alert('Failed to read the file. Please try again.');
+        this.showStatusMessage('Failed to read the file. Please try again.', "error");
       }
       this.elements.importFileInput.value = '';
       this.elements.importFileDetails.style.display = 'none';
@@ -977,7 +958,7 @@ class RulesManager {
       const importedRules = importData.rules || [];
 
       const validRules = importedRules
-        .map(rule => this.upgradeRule(rule))
+        .map(rule => upgradeRule(rule))
         .filter(Boolean);
 
       if (importMode === "replace") {
@@ -1003,11 +984,11 @@ class RulesManager {
         : `Successfully imported ${validRules.length} rules (${this.rules.length} total rules).`;
 
       this.elements.importDialog.close();
-      alert(message);
+      this.showStatusMessage(message, "success");
 
     } catch (error) {
       console.error('Import failed:', error);
-      alert('Failed to import rules. Please try again.');
+      this.showStatusMessage('Failed to import rules. Please try again.', "error");
     }
   }
 
@@ -1034,23 +1015,27 @@ class RulesManager {
     );
   }
 
-  // Wrap storage methods in the class
-  storageGet(keys) {
-    return storageGet(keys);
-  }
 
-  storageSet(items) {
-    return storageSet(items);
-  }
-
-  upgradeRule(rule) {
-    return upgradeRule(rule);
-  }
 
   async persistRules() {
-    this.rules = this.rules.map(rule => this.upgradeRule(rule)).filter(Boolean);
-    await this.storageSet({ rules: this.rules });
+    this.rules = this.rules.map(rule => upgradeRule(rule)).filter(Boolean);
+    await storageSet({ rules: this.rules });
     this.renderRulesList();
+  }
+
+  showStatusMessage(message, type = "info") {
+    // Create a temporary status message
+    const statusEl = document.createElement("div");
+    statusEl.className = `status-message status-${type}`;
+    statusEl.textContent = message;
+
+    document.body.appendChild(statusEl);
+
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+      statusEl.classList.add("status-removing");
+      setTimeout(() => statusEl.remove(), 300);
+    }, 3000);
   }
 
 }
