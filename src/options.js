@@ -111,12 +111,10 @@ class RulesManager {
 
     // Rule details
     const nameGroup = this.createDetailGroup("Rule Name", rule.name || "No name set");
-    const patternGroup = this.createDetailGroup("Pattern", rule.pattern, true);
-    const typeGroup = this.createDetailGroup("Match Type", rule.type === "regex" ? "Regular Expression" : "String Match");
+    const patternGroup = this.createDetailGroup("Pattern (Regular Expression)", rule.pattern, true);
 
     content.appendChild(nameGroup);
     content.appendChild(patternGroup);
-    content.appendChild(typeGroup);
 
     // Transformations section
     const transformationsSection = document.createElement("div");
@@ -182,7 +180,6 @@ class RulesManager {
       ruleIndexField: document.getElementById("ruleIndex"),
       ruleNameInput: document.getElementById("ruleName"),
       patternInput: document.getElementById("pattern"),
-      typeSelect: document.getElementById("type"),
       transformRowTemplate: document.getElementById("transformRowTemplate"),
       exportBtn: document.getElementById("exportRules"),
       importBtn: document.getElementById("importRules"),
@@ -312,7 +309,7 @@ class RulesManager {
     const newRule = {
       name: "New Rule",
       pattern: "",
-      type: "string",
+      type: "regex",
       transformations: []
     };
 
@@ -364,15 +361,10 @@ class RulesManager {
 
     // Form fields
     const nameGroup = this.createFormGroup("Rule Name:", "editRuleName", "text", rule.name || "", true);
-    const patternGroup = this.createFormGroup("Pattern:", "editPattern", "text", rule.pattern, true);
-    const typeGroup = this.createSelectGroup("Match Type:", "editType", [
-      { value: "string", label: "String", selected: rule.type === "string" },
-      { value: "regex", label: "Regex", selected: rule.type === "regex" }
-    ]);
+    const patternGroup = this.createFormGroup("Pattern (Regular Expression):", "editPattern", "text", rule.pattern, true);
 
     content.appendChild(nameGroup);
     content.appendChild(patternGroup);
-    content.appendChild(typeGroup);
 
     // Transformations section
     const transformationsSection = document.createElement("div");
@@ -470,13 +462,12 @@ class RulesManager {
 
     const nameInput = document.getElementById("editRuleName");
     const patternInput = document.getElementById("editPattern");
-    const typeSelect = document.getElementById("editType");
 
-    if (!nameInput || !patternInput || !typeSelect) return;
+    if (!nameInput || !patternInput) return;
 
     const name = nameInput.value.trim();
     const pattern = patternInput.value.trim();
-    const type = typeSelect.value;
+    const type = "regex"; // All rules are now regex-based
 
     if (!pattern) {
       alert("Pattern is required");
@@ -615,53 +606,42 @@ class RulesManager {
       let matches = [];
       let regexMatches = [];
 
-      if (rule.type === "regex") {
-        try {
-          const regex = new RegExp(rule.pattern, 'g');
-          let match;
-          let matchCount = 0;
+      try {
+        const regex = new RegExp(rule.pattern, 'g');
+        let match;
+        let matchCount = 0;
 
-          while ((match = regex.exec(testString)) !== null && matchCount < 100) {
-            matchCount++;
-            
-            const matchData = {
-              fullMatch: match[0],
-              groups: [],
-              index: match.index
-            };
+        while ((match = regex.exec(testString)) !== null && matchCount < 100) {
+          matchCount++;
+          
+          const matchData = {
+            fullMatch: match[0],
+            groups: [],
+            index: match.index
+          };
 
-            // Process capturing groups
-            for (let i = 1; i < match.length; i++) {
-              if (match[i] !== undefined) {
-                matchData.groups.push({
-                  number: i,
-                  value: match[i]
-                });
-              }
-            }
-
-            regexMatches.push(matchData);
-
-            // Prevent infinite loops for zero-width matches
-            if (match[0].length === 0) {
-              regex.lastIndex++;
+          // Process capturing groups
+          for (let i = 1; i < match.length; i++) {
+            if (match[i] !== undefined) {
+              matchData.groups.push({
+                number: i,
+                value: match[i]
+              });
             }
           }
 
-          matches = regexMatches;
-        } catch (error) {
-          this.displayTestError(`Invalid regex pattern: ${error.message}`);
-          return;
+          regexMatches.push(matchData);
+
+          // Prevent infinite loops for zero-width matches
+          if (match[0].length === 0) {
+            regex.lastIndex++;
+          }
         }
-      } else {
-        // String matching
-        if (testString.includes(rule.pattern)) {
-          matches = [{
-            fullMatch: rule.pattern,
-            groups: [],
-            index: testString.indexOf(rule.pattern)
-          }];
-        }
+
+        matches = regexMatches;
+      } catch (error) {
+        this.displayTestError(`Invalid regex pattern: ${error.message}`);
+        return;
       }
 
       this.displayTestResult(rule, testString, matches);
@@ -686,17 +666,15 @@ class RulesManager {
       // Left section: Highlighted text and capturing groups
       html += '<div class="test-section-group">';
       
-      // Show highlighted text
-      if (rule.type === "regex") {
-        const highlightedText = this.createHighlightedText(rule.pattern, testString);
-        html += '<div class="test-section">';
-        html += '<h4>Highlighted Match:</h4>';
-        html += `<div class="highlighted-output">${highlightedText}</div>`;
-        html += '</div>';
-      }
+      // Show highlighted text (all rules are regex-based)
+      const highlightedText = this.createHighlightedText(rule.pattern, testString);
+      html += '<div class="test-section">';
+      html += '<h4>Highlighted Match:</h4>';
+      html += `<div class="highlighted-output">${highlightedText}</div>`;
+      html += '</div>';
 
-      // Show capturing groups for regex
-      if (rule.type === "regex" && matches.some(m => m.groups.length > 0)) {
+      // Show capturing groups
+      if (matches.some(m => m.groups.length > 0)) {
         html += '<div class="test-section">';
         html += '<h4>Capturing Groups:</h4>';
         html += this.createGroupsDisplay(matches);

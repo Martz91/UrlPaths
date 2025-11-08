@@ -63,7 +63,7 @@ function upgradeRule(rule) {
   }
 
   const name = typeof rule.name === "string" && rule.name.trim().length > 0 ? rule.name.trim() : pattern;
-  const type = rule.type === "regex" ? "regex" : "string";
+  const type = "regex"; // All rules are now regex-based
   const transformations = Array.isArray(rule.transformations)
     ? rule.transformations.map(toTransformation).filter(Boolean)
     : [];
@@ -90,44 +90,25 @@ function resolveTransformations(rule, url) {
     return null;
   }
 
-  if (rule.type === "regex") {
-    let regex;
-    try {
-      regex = new RegExp(rule.pattern);
-    } catch (error) {
-      console.warn("Invalid regex pattern", rule.pattern, error);
-      return null;
-    }
-
-    const match = url.match(regex);
-    if (!match) {
-      return null;
-    }
-
-    return transformations
-      .map(({ name, template }) => {
-        const target = template.replace(/{{(\d+)}}/g, (full, group) => {
-          const groupIndex = Number(group);
-          return match[groupIndex] ?? "";
-        });
-        return {
-          name: name || target,
-          template,
-          target,
-        };
-      })
-      .filter((item) => item.target && isLikelyUrl(item.target));
+  let regex;
+  try {
+    regex = new RegExp(rule.pattern);
+  } catch (error) {
+    console.warn("Invalid regex pattern", rule.pattern, error);
+    return null;
   }
 
-  if (!url.includes(rule.pattern)) {
+  const match = url.match(regex);
+  if (!match) {
     return null;
   }
 
   return transformations
     .map(({ name, template }) => {
-      const target = template
-        .replace(/\{\{\s*url\s*\}\}/gi, url)
-        .replace(/\{\{\s*pattern\s*\}\}/gi, rule.pattern);
+      const target = template.replace(/{{(\d+)}}/g, (full, group) => {
+        const groupIndex = Number(group);
+        return match[groupIndex] ?? "";
+      });
       return {
         name: name || target,
         template,

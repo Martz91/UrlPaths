@@ -24,16 +24,16 @@ async function initPopup() {
     }
     currentTab = tab;
 
-    const stored = await storageGet({ paths: [] });
-    const paths = Array.isArray(stored.paths)
-      ? stored.paths.map(upgradeRule).filter(Boolean)
+    const stored = await storageGet({ rules: [] });
+    const rules = Array.isArray(stored.rules)
+      ? stored.rules.map(upgradeRule).filter(Boolean)
       : [];
-    if (paths.length === 0) {
+    if (rules.length === 0) {
       statusEl.textContent = "No rules configured yet.";
       return;
     }
 
-    const matches = collectMatches(paths, tab.url);
+    const matches = collectMatches(rules, tab.url);
     matchesContainer.innerHTML = "";
 
     if (matches.length === 0) {
@@ -51,12 +51,12 @@ async function initPopup() {
 
 /**
  * Collects rule matches for the given URL and returns transformation metadata.
- * @param {Array<Object>} paths - The stored rule definitions.
+ * @param {Array<Object>} rules - The stored rule definitions.
  * @param {string} url - The current tab URL to evaluate.
  * @returns {Array<Object>} Matched rules with their applicable transformations.
  */
-function collectMatches(paths, url) {
-  return paths
+function collectMatches(rules, url) {
+  return rules
     .map((rule, index) => {
       const transformations = resolveTransformations(rule, url);
       if (!transformations || transformations.length === 0) {
@@ -78,7 +78,7 @@ function renderMatch(match) {
   const list = fragment.querySelector(".match__list");
 
   title.textContent = rule.name || rule.pattern;
-  const ruleKind = rule.type === "regex" ? "Regex" : "String";
+  // All rules are now regex-based
 
   transformations.forEach((item) => {
     const transformNode = transformTemplate.content.cloneNode(true);

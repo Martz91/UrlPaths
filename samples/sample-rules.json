@@ -1,0 +1,44 @@
+{
+  "version": "1.0.0",
+  "exportDate": "2025-11-08T20:45:06.305Z",
+  "rules": [
+    {
+      "name": "GitHub Repository to Issues",
+      "pattern": "https://github\\.com/([^/]+)/([^/]+)/?$",
+      "type": "regex",
+      "transformations": [
+        {
+          "name": "Issues",
+          "template": "https://github.com/{{1}}/{{2}}/issues"
+        },
+        {
+          "name": "Pull Requests",
+          "template": "https://github.com/{{1}}/{{2}}/pulls"
+        },
+        {
+          "name": "Actions",
+          "template": "https://github.com/{{1}}/{{2}}/actions"
+        }
+      ]
+    },
+    {
+      "name": "SharePoint Admin",
+      "pattern": "https:\\/\\/([a-zA-Z0-9-]+)\\.sharepoint\\.com\\/sites\\/([a-zA-Z0-9_-]+)",
+      "type": "regex",
+      "transformations": [
+        {
+          "name": "Site Contents",
+          "template": "https://{{1}}.sharepoint.com/sites/{{2}}/_layouts/15/viewlsts.aspx?view=14"
+        },
+        {
+          "name": "Permissions",
+          "template": "https://{{1}}.sharepoint.com/sites/{{2}}/_layouts/15/user.aspx"
+        },
+        {
+          "name": "User Information List",
+          "template": "https://{{1}}.sharepoint.com/sites/{{2}}/_catalogs/users/simple.aspx"
+        }
+      ]
+    }
+  ]
+}
